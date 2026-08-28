@@ -18,6 +18,8 @@ const formatStatus = (value: string) => value.replace(/_/g, " ");
 export default function App() {
   const [stats, setStats] = useState<{ [key: string]: number | string }>({});
   const [issues, setIssues] = useState<Issue[]>([]);
+  const [selectedIssueId, setSelectedIssueId] = useState<number | null>(null);
+  const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [priority, setPriority] = useState("all");
@@ -42,8 +44,13 @@ export default function App() {
         const issuesPayload = await issuesRes.json();
         const statsPayload = await statsRes.json();
 
-        setIssues(issuesPayload.results ?? issuesPayload);
+        const nextIssues = issuesPayload.results ?? issuesPayload;
+        setIssues(nextIssues);
         setStats(statsPayload);
+
+        if (!selectedIssueId || !nextIssues.some((issue: Issue) => issue.id === selectedIssueId)) {
+          setSelectedIssueId(nextIssues[0]?.id ?? null);
+        }
       } catch (error) {
         console.error("Failed to load DevFlow data", error);
       } finally {
@@ -53,6 +60,45 @@ export default function App() {
 
     loadData();
   }, [search, status, priority]);
+
+  useEffect(() => {
+    if (!selectedIssueId) {
+      setSelectedIssue(null);
+      return;
+    }
+
+    async function loadIssue() {
+      try {
+        const response = await fetch(`${apiBase}/issues/${selectedIssueId}/`);
+        const issue = await response.json();
+        setSelectedIssue(issue);
+      } catch (error) {
+        console.error("Failed to load issue detail", error);
+      }
+    }
+
+    loadIssue();
+  }, [selectedIssueId]);
+
+  const updateIssueStatus = async (nextStatus: string) => {
+    if (!selectedIssue) return;
+
+    try {
+      const response = await fetch(`${apiBase}/issues/${selectedIssue.id}/`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+
+      const updated = await response.json();
+      setSelectedIssue((current) => (current ? { ...current, ...updated } : current));
+      setIssues((current) => current.map((issue) => (issue.id === updated.id ? { ...issue, ...updated } : issue)));
+    } catch (error) {
+      console.error("Failed to update issue", error);
+    }
+  };
 
   const statCards = [
     { label: "Open issues", value: stats.open_issues ?? 0, delta: "live queue" },
@@ -128,7 +174,12 @@ export default function App() {
               <p className="empty-state">No issues match the current filter.</p>
             ) : (
               issues.map((issue: Issue) => (
-                <div key={issue.id} className="issue-row">
+                <button
+                  key={issue.id}
+                  type="button"
+                  className={`issue-row ${selectedIssueId === issue.id ? "active" : ""}`}
+                  onClick={() => setSelectedIssueId(issue.id)}
+                >
                   <div>
                     <strong>{issue.slug}</strong>
                     <p>{issue.title}</p>
@@ -138,10 +189,56 @@ export default function App() {
                     <span>{formatStatus(issue.status)}</span>
                     <span>{issue.priority}</span>
                   </div>
-                </div>
+                </button>
               ))
             )}
           </div>
+        </article>
+
+        <article className="surface detail-panel">
+          <div className="section-header">
+            <h2>Issue detail</h2>
+            <span>{selectedIssue ? "Live" : "Idle"}</span>
+          </div>
+
+          {selectedIssue ? (
+            <div className="detail-card">
+              <div className="detail-header">
+                <div>
+                  <p className="detail-label">{selectedIssue.slug}</p>
+                  <h3>{selectedIssue.title}</h3>
+                </div>
+                <span className="detail-badge">{selectedIssue.priority}</span>
+              </div>
+
+              <div className="detail-meta">
+                <span>{selectedIssue.project_name ?? "Platform"}</span>
+                <span>{selectedIssue.assignee_name ?? "Unassigned"}</span>
+              </div>
+
+              <p className="detail-description">
+                {selectedIssue.description || "No additional description provided."}
+              </p>
+
+              <div className="detail-actions">
+                <label>
+                  Status
+                  <select
+                    value={selectedIssue.status}
+                    onChange={(event) => updateIssueStatus(event.target.value)}
+                  >
+                    <option value="todo">Todo</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="in_review">In Review</option>
+                    <option value="blocked">Blocked</option>
+                    <option value="done">Done</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+          ) : (
+            <p className="empty-state">Select an issue to review details and update its workflow.</p>
+          )}
         </article>
 
         <article className="surface">
