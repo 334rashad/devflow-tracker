@@ -31,6 +31,20 @@ type CurrentUser = {
   is_staff: boolean;
 };
 
+type AnalyticsEntry = {
+  status?: string;
+  priority?: string;
+  count: number;
+};
+
+type DeliveryAnalytics = {
+  status_distribution: AnalyticsEntry[];
+  priority_distribution: AnalyticsEntry[];
+  project_health: Array<{ project: string; total_issues: number; blocked_issues: number; completion_rate: number }>;
+  workload: Array<{ member: string; active_issues: number }>;
+  risks: { blocked_issues: number; overdue_issues: number; completion_rate: number };
+};
+
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
 
 const getCsrfToken = () => {
@@ -77,6 +91,7 @@ export default function App() {
   const [stats, setStats] = useState<{ [key: string]: number | string }>({});
   const [issues, setIssues] = useState<Issue[]>([]);
   const [activity, setActivity] = useState<Array<Record<string, unknown>>>([]);
+  const [analytics, setAnalytics] = useState<DeliveryAnalytics | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [selectedIssueId, setSelectedIssueId] = useState<number | null>(null);
@@ -147,12 +162,13 @@ export default function App() {
 
     setLoading(true);
     try {
-      const [issuesRes, statsRes, activityRes, projectsRes, teamMembersRes] = await Promise.all([
+      const [issuesRes, statsRes, activityRes, projectsRes, teamMembersRes, analyticsRes] = await Promise.all([
         fetchJson(`/issues/${issueQuery}`),
         fetchJson(`/dashboard/`),
         fetchJson(`/activity/?page_size=5`),
         fetchJson(`/projects/`),
         fetchJson(`/team-members/`),
+        fetchJson(`/analytics/`),
       ]);
 
       const issuesPayload = await issuesRes.json();
@@ -160,6 +176,7 @@ export default function App() {
       const activityPayload = await activityRes.json();
       const projectsPayload = await projectsRes.json();
       const teamMembersPayload = await teamMembersRes.json();
+      const analyticsPayload = await analyticsRes.json();
 
       const nextIssues = normalizeList<Issue>(issuesPayload);
       const nextProjects = normalizeList<Project>(projectsPayload);
@@ -168,6 +185,7 @@ export default function App() {
       setActivity(normalizeList<Record<string, unknown>>(activityPayload));
       setProjects(nextProjects);
       setTeamMembers(normalizeList<TeamMember>(teamMembersPayload));
+      setAnalytics(analyticsPayload);
       setDraftIssue((current) =>
         current.project || nextProjects.length === 0
           ? current
@@ -364,6 +382,7 @@ export default function App() {
       setSelectedIssue(null);
       setIssues([]);
       setActivity([]);
+      setAnalytics(null);
     }
   };
 
@@ -380,6 +399,8 @@ export default function App() {
     ...member,
     activeIssues: issues.filter((issue) => issue.assignee === member.id && issue.status !== "done").length,
   }));
+  const maxStatusCount = Math.max(...(analytics?.status_distribution.map((entry) => entry.count) ?? [1]), 1);
+  const maxPriorityCount = Math.max(...(analytics?.priority_distribution.map((entry) => entry.count) ?? [1]), 1);
 
   if (isAuthenticated === null) {
     return (
@@ -636,6 +657,54 @@ export default function App() {
             )}
           </ul>
         </article>
+
+        {analytics ? (
+          <article className="surface analytics-panel">
+            <div className="section-header">
+              <h2>Delivery health</h2>
+              <span>{analytics.risks.completion_rate}% complete</span>
+            </div>
+            <div className="risk-summary">
+              <div><strong>{analytics.risks.blocked_issues}</strong><span>Blocked</span></div>
+              <div><strong>{analytics.risks.overdue_issues}</strong><span>Overdue</span></div>
+              <div><strong>{analytics.risks.completion_rate}%</strong><span>Completed</span></div>
+            </div>
+            <div className="analytics-grid">
+              <div>
+                <h3>Workflow</h3>
+                <div className="distribution-list">
+                  {analytics.status_distribution.map((entry) => (
+                    <div className="distribution-row" key={entry.status}>
+                      <span>{formatStatus(entry.status ?? "")}</span>
+                      <div className="metric-track"><i style={{ width: `${entry.count / maxStatusCount * 100}%` }} /></div>
+                      <strong>{entry.count}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <h3>Priority mix</h3>
+                <div className="distribution-list">
+                  {analytics.priority_distribution.map((entry) => (
+                    <div className="distribution-row" key={entry.priority}>
+                      <span>{formatStatus(entry.priority ?? "")}</span>
+                      <div className="metric-track priority-track"><i style={{ width: `${entry.count / maxPriorityCount * 100}%` }} /></div>
+                      <strong>{entry.count}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="project-health-list">
+              {analytics.project_health.map((project) => (
+                <div className="project-health-row" key={project.project}>
+                  <div><strong>{project.project}</strong><small>{project.total_issues} issues{project.blocked_issues ? `, ${project.blocked_issues} blocked` : ""}</small></div>
+                  <span>{project.completion_rate}% complete</span>
+                </div>
+              ))}
+            </div>
+          </article>
+        ) : null}
 
         {currentUser?.is_staff ? (
           <article className="surface team-panel">

@@ -318,6 +318,110 @@ h1 {
   grid-column: 1 / -1;
 }
 
+.analytics-panel {
+  grid-column: 1 / -1;
+}
+
+.risk-summary,
+.analytics-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.risk-summary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 24px;
+}
+
+.risk-summary div {
+  display: grid;
+  gap: 5px;
+  padding: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.risk-summary strong {
+  font-size: 1.35rem;
+}
+
+.risk-summary span,
+.project-health-row small {
+  color: #9bb0d0;
+  font-size: 0.82rem;
+}
+
+.analytics-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.analytics-grid h3 {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+}
+
+.distribution-list {
+  display: grid;
+  gap: 10px;
+}
+
+.distribution-row {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 10px;
+  color: #cfe0fb;
+  font-size: 0.85rem;
+}
+
+.distribution-row strong {
+  text-align: right;
+}
+
+.metric-track {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: rgba(148, 163, 184, 0.14);
+}
+
+.metric-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #14b8a6;
+}
+
+.priority-track i {
+  background: #f59e0b;
+}
+
+.project-health-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.project-health-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.project-health-row div {
+  display: grid;
+  gap: 4px;
+}
+
+.project-health-row > span {
+  color: #86efac;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
 .member-form-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -492,6 +596,11 @@ h1 {
   }
 
   .member-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .risk-summary,
+  .analytics-grid {
     grid-template-columns: 1fr;
   }
 
