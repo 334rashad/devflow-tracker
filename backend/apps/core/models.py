@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 
@@ -10,6 +11,7 @@ class TimestampedModel(models.Model):
 
 
 class TeamMember(TimestampedModel):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="team_member", null=True, blank=True)
     name = models.CharField(max_length=120)
     role = models.CharField(max_length=120)
     email = models.EmailField(unique=True)

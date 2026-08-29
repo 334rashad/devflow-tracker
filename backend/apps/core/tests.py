@@ -1,3 +1,4 @@
+from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
@@ -8,8 +9,14 @@ from apps.core.models import ActivityLog, Issue, Project, TeamMember
 class IssueApiTests(APITestCase):
     def setUp(self):
         self.client = APIClient()
-        self.lead = TeamMember.objects.create(name="Ava Chen", role="Lead", email="ava@example.com")
-        self.project = Project.objects.create(name="Platform", key="platform", owner=self.lead)
+        self.user = get_user_model().objects.create_user(username="ava", password="secret123")
+        self.member = TeamMember.objects.create(
+            user=self.user,
+            name="Ava Chen",
+            role="Lead",
+            email="ava@devflow.local",
+        )
+        self.project = Project.objects.create(name="Platform", key="platform", owner=self.member)
         self.issue = Issue.objects.create(
             project=self.project,
             title="Fix flaky auth refresh flow",
@@ -17,6 +24,7 @@ class IssueApiTests(APITestCase):
             description="Auth refresh triggers duplicate calls under load.",
             status=Issue.Status.IN_REVIEW,
             priority=Issue.Priority.HIGH,
+            assignee=self.member,
         )
         Issue.objects.create(
             project=self.project,
@@ -25,7 +33,9 @@ class IssueApiTests(APITestCase):
             description="Add release metrics to the dashboard.",
             status=Issue.Status.TODO,
             priority=Issue.Priority.MEDIUM,
+            assignee=self.member,
         )
+        self.client.force_authenticate(user=self.user)
 
     def test_issue_search_filters_by_keyword(self):
         response = self.client.get(reverse("issue-list"), {"search": "auth"})
@@ -55,3 +65,19 @@ class IssueApiTests(APITestCase):
                 details__to=Issue.Status.DONE,
             ).exists()
         )
+
+    def test_login_endpoint_authenticates_user_and_scopes_issues(self):
+        login_client = APIClient()
+        login_response = login_client.post(
+            reverse("auth-login"),
+            {"username": "ava", "password": "secret123"},
+            format="json",
+        )
+
+        self.assertEqual(login_response.status_code, status.HTTP_200_OK)
+        self.assertTrue(login_response.data["authenticated"])
+
+        scoped_response = login_client.get(reverse("issue-list"))
+        self.assertEqual(scoped_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(scoped_response.data["count"], 2)
+        self.assertEqual(scoped_response.data["results"][0]["assignee_name"], "Ava Chen")
