@@ -10,6 +10,21 @@ from .models import ActivityLog, Issue, Project, TeamMember
 from .serializers import ActivityLogSerializer, IssueSerializer, ProjectSerializer, TeamMemberSerializer
 
 
+def auth_payload(user):
+    team_member = getattr(user, "team_member", None)
+    return {
+        "authenticated": user.is_authenticated,
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "name": team_member.name if team_member else None,
+            "is_staff": user.is_staff,
+        }
+        if user.is_authenticated
+        else None,
+    }
+
+
 class LoginView(APIView):
     permission_classes = [AllowAny]
 
@@ -17,7 +32,7 @@ class LoginView(APIView):
         from django.middleware.csrf import get_token
 
         get_token(request)
-        return Response({"authenticated": request.user.is_authenticated})
+        return Response(auth_payload(request.user))
 
     def post(self, request):
         username = request.data.get("username")
@@ -28,18 +43,7 @@ class LoginView(APIView):
             return Response({"authenticated": False, "error": "Invalid username or password."}, status=401)
 
         login(request, user)
-        team_member = getattr(user, "team_member", None)
-        return Response(
-            {
-                "authenticated": True,
-                "user": {
-                    "id": user.id,
-                    "username": user.username,
-                    "name": team_member.name if team_member else None,
-                    "is_staff": user.is_staff,
-                },
-            }
-        )
+        return Response(auth_payload(user))
 
 
 class TeamMemberViewSet(viewsets.ModelViewSet):

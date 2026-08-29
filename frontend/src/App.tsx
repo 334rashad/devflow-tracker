@@ -43,6 +43,17 @@ const getCsrfToken = () => {
 
 const formatStatus = (value: string) => value.replace(/_/g, " ");
 
+const formatApiError = (payload: unknown, fallback: string) => {
+  if (typeof payload === "string") return payload;
+  if (payload && typeof payload === "object") {
+    const messages = Object.values(payload as Record<string, unknown>).flatMap((value) =>
+      Array.isArray(value) ? value.map(String) : [String(value)],
+    );
+    if (messages.length > 0) return messages.join(" ");
+  }
+  return fallback;
+};
+
 const formatActivityMessage = (entry: {
   actor_name?: string;
   issue_slug?: string;
@@ -325,6 +336,9 @@ export default function App() {
         body: JSON.stringify(draftMember),
       });
       const created = await response.json();
+      if (!response.ok) {
+        throw new Error(formatApiError(created, "Failed to create the member account."));
+      }
       setTeamMembers((current) => [...current, created].sort((left, right) => left.name.localeCompare(right.name)));
       setDraftMember({ name: "", role: "", email: "", login_username: "", password: "" });
       setIsManagingTeam(false);
@@ -356,12 +370,13 @@ export default function App() {
           <form onSubmit={handleLogin} className="auth-form">
             <label>
               Username
-              <input value={username} onChange={(event) => setUsername(event.target.value)} />
+              <input autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} />
             </label>
             <label>
               Password
               <input
                 type="password"
+                autoComplete="current-password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
               />
@@ -600,13 +615,13 @@ export default function App() {
             </div>
 
             {isManagingTeam ? (
-              <form className="issue-form" onSubmit={createTeamMember}>
+              <form className="issue-form" onSubmit={createTeamMember} autoComplete="off">
                 <div className="issue-form-grid member-form-grid">
-                  <input value={draftMember.name} onChange={(event) => setDraftMember((current) => ({ ...current, name: event.target.value }))} placeholder="Full name" />
-                  <input value={draftMember.role} onChange={(event) => setDraftMember((current) => ({ ...current, role: event.target.value }))} placeholder="Role" />
-                  <input type="email" value={draftMember.email} onChange={(event) => setDraftMember((current) => ({ ...current, email: event.target.value }))} placeholder="Work email" />
-                  <input value={draftMember.login_username} onChange={(event) => setDraftMember((current) => ({ ...current, login_username: event.target.value }))} placeholder="Login username" />
-                  <input type="password" value={draftMember.password} onChange={(event) => setDraftMember((current) => ({ ...current, password: event.target.value }))} placeholder="Temporary password" />
+                  <label>Full name<input value={draftMember.name} onChange={(event) => setDraftMember((current) => ({ ...current, name: event.target.value }))} placeholder="Jordan Lee" /></label>
+                  <label>Role<input value={draftMember.role} onChange={(event) => setDraftMember((current) => ({ ...current, role: event.target.value }))} placeholder="QA Engineer" /></label>
+                  <label>Work email<input type="email" autoComplete="off" value={draftMember.email} onChange={(event) => setDraftMember((current) => ({ ...current, email: event.target.value }))} placeholder="jordan@company.com" /></label>
+                  <label>Login username<input name="new-member-username" autoComplete="new-password" value={draftMember.login_username} onChange={(event) => setDraftMember((current) => ({ ...current, login_username: event.target.value }))} placeholder="jordan.lee" /></label>
+                  <label>Temporary password<input type="password" name="new-member-password" autoComplete="new-password" value={draftMember.password} onChange={(event) => setDraftMember((current) => ({ ...current, password: event.target.value }))} placeholder="At least 8 characters" /></label>
                 </div>
                 {memberError ? <p className="auth-error">{memberError}</p> : null}
                 <button className="command-button" type="submit">Create member account</button>

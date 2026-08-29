@@ -49,6 +49,79 @@ h1 {
   max-width: 11ch;
 }
 
+.auth-shell {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding-top: 32px;
+  padding-bottom: 32px;
+}
+
+.auth-card {
+  width: min(100%, 440px);
+  padding: 32px;
+}
+
+.auth-card h1 {
+  max-width: 18ch;
+  font-size: 2rem;
+  line-height: 1.15;
+}
+
+.auth-form {
+  display: grid;
+  gap: 16px;
+  margin-top: 28px;
+}
+
+.auth-form label,
+.member-form-grid label {
+  display: grid;
+  gap: 8px;
+  color: #cfe0fb;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.auth-form input,
+.auth-form button {
+  width: 100%;
+  min-height: 46px;
+  border-radius: 8px;
+  font: inherit;
+}
+
+.auth-form input {
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(15, 23, 42, 0.8);
+  color: #e2e8f0;
+  padding: 10px 12px;
+}
+
+.auth-form button {
+  border: 1px solid rgba(125, 211, 252, 0.35);
+  background: #0e7490;
+  color: #ecfeff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.auth-form button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.auth-hint,
+.auth-error {
+  margin: 0;
+  color: #9bb0d0;
+  font-size: 0.88rem;
+}
+
+.auth-error {
+  color: #fca5a5;
+}
+
 .hero-copy {
   max-width: 56ch;
   color: #adc2df;
@@ -186,6 +259,11 @@ h1 {
   color: #e2e8f0;
   padding: 11px 12px;
   font: inherit;
+}
+
+.issue-form label {
+  display: grid;
+  gap: 8px;
 }
 
 .issue-form textarea {

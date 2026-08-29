@@ -134,6 +134,14 @@ class IssueApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("csrftoken", response.cookies)
 
+    def test_login_session_bootstrap_returns_current_user(self):
+        response = self.client.get(reverse("auth-login"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["authenticated"])
+        self.assertEqual(response.data["user"]["username"], self.user.username)
+        self.assertFalse(response.data["user"]["is_staff"])
+
     def test_login_endpoint_authenticates_user_and_scopes_issues(self):
         login_client = APIClient()
         login_response = login_client.post(
