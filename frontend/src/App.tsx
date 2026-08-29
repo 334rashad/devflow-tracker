@@ -15,9 +15,29 @@ const apiBase = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api"
 
 const formatStatus = (value: string) => value.replace(/_/g, " ");
 
+const formatActivityMessage = (entry: {
+  actor_name?: string;
+  issue_slug?: string;
+  issue_title?: string;
+  action?: string;
+  details?: { from?: string; to?: string };
+}) => {
+  const actor = entry.actor_name ?? "System";
+  const issueRef = entry.issue_slug ?? entry.issue_title ?? "issue";
+  const action = entry.action ?? "updated";
+  const details = entry.details;
+
+  if (details?.from && details?.to) {
+    return `${actor} ${action.toLowerCase()} ${issueRef} from ${formatStatus(details.from)} to ${formatStatus(details.to)}`;
+  }
+
+  return `${actor} ${action.toLowerCase()} ${issueRef}`;
+};
+
 export default function App() {
   const [stats, setStats] = useState<{ [key: string]: number | string }>({});
   const [issues, setIssues] = useState<Issue[]>([]);
+  const [activity, setActivity] = useState<Array<Record<string, unknown>>>([]);
   const [selectedIssueId, setSelectedIssueId] = useState<number | null>(null);
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
   const [search, setSearch] = useState("");
@@ -36,17 +56,20 @@ export default function App() {
     async function loadData() {
       setLoading(true);
       try {
-        const [issuesRes, statsRes] = await Promise.all([
+        const [issuesRes, statsRes, activityRes] = await Promise.all([
           fetch(requestUrl),
           fetch(`${apiBase}/dashboard/`),
+          fetch(`${apiBase}/activity/?page_size=5`),
         ]);
 
         const issuesPayload = await issuesRes.json();
         const statsPayload = await statsRes.json();
+        const activityPayload = await activityRes.json();
 
         const nextIssues = issuesPayload.results ?? issuesPayload;
         setIssues(nextIssues);
         setStats(statsPayload);
+        setActivity(activityPayload.results ?? activityPayload);
 
         if (!selectedIssueId || !nextIssues.some((issue: Issue) => issue.id === selectedIssueId)) {
           setSelectedIssueId(nextIssues[0]?.id ?? null);
@@ -59,7 +82,7 @@ export default function App() {
     }
 
     loadData();
-  }, [search, status, priority]);
+  }, [search, status, priority, selectedIssueId]);
 
   useEffect(() => {
     if (!selectedIssueId) {
@@ -95,6 +118,10 @@ export default function App() {
       const updated = await response.json();
       setSelectedIssue((current) => (current ? { ...current, ...updated } : current));
       setIssues((current) => current.map((issue) => (issue.id === updated.id ? { ...issue, ...updated } : issue)));
+
+      const refreshedActivity = await fetch(`${apiBase}/activity/?page_size=5`);
+      const nextActivity = await refreshedActivity.json();
+      setActivity(nextActivity.results ?? nextActivity);
     } catch (error) {
       console.error("Failed to update issue", error);
     }
@@ -105,12 +132,6 @@ export default function App() {
     { label: "Blocked", value: stats.blocked_issues ?? 0, delta: "needs review" },
     { label: "In progress", value: stats.in_progress_issues ?? 0, delta: "active work" },
     { label: "Projects", value: stats.projects ?? 0, delta: "tracked" },
-  ];
-
-  const activity = [
-    "Ava moved BUG-214 to In Review",
-    "Omar added a comment to FEAT-118",
-    "Sam linked a production incident to BUG-203",
   ];
 
   return (
@@ -247,9 +268,22 @@ export default function App() {
             <span>Team timeline</span>
           </div>
           <ul className="activity-list">
-            {activity.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
+            {activity.length === 0 ? (
+              <li>No activity yet.</li>
+            ) : (
+              activity.map((item) => {
+                const entry = item as {
+                  id: number;
+                  actor_name?: string;
+                  issue_slug?: string;
+                  issue_title?: string;
+                  action?: string;
+                  details?: { from?: string; to?: string };
+                };
+
+                return <li key={entry.id}>{formatActivityMessage(entry)}</li>;
+              })
+            )}
           </ul>
         </article>
       </section>

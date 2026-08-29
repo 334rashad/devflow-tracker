@@ -24,6 +24,19 @@ class IssueViewSet(viewsets.ModelViewSet):
     filterset_fields = ["project", "status", "priority", "assignee"]
     search_fields = ["title", "description", "slug"]
 
+    def perform_update(self, serializer):
+        issue = self.get_object()
+        previous_status = issue.status
+        updated_issue = serializer.save()
+
+        if previous_status != updated_issue.status:
+            ActivityLog.objects.create(
+                issue=updated_issue,
+                actor=updated_issue.assignee,
+                action="Status updated",
+                details={"from": previous_status, "to": updated_issue.status},
+            )
+
 
 class ActivityLogViewSet(viewsets.ModelViewSet):
     queryset = ActivityLog.objects.select_related("issue", "actor").all().order_by("-created_at")

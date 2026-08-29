@@ -42,7 +42,19 @@ class IssueSerializer(serializers.ModelSerializer):
 
 class ActivityLogSerializer(serializers.ModelSerializer):
     actor_name = serializers.CharField(source="actor.name", read_only=True)
+    issue_slug = serializers.CharField(source="issue.slug", read_only=True)
+    issue_title = serializers.CharField(source="issue.title", read_only=True)
 
     class Meta:
         model = ActivityLog
-        fields = ["id", "issue", "actor", "actor_name", "action", "details", "created_at"]
+        fields = [
+            "id",
+            "issue",
+            "issue_slug",
+            "issue_title",
+            "actor",
+            "actor_name",
+            "action",
+            "details",
+            "created_at",
+        ]

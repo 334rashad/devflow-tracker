@@ -2,7 +2,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 
-from apps.core.models import Issue, Project, TeamMember
+from apps.core.models import ActivityLog, Issue, Project, TeamMember
 
 
 class IssueApiTests(APITestCase):
@@ -38,3 +38,20 @@ class IssueApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["count"], 1)
         self.assertEqual(response.data["results"][0]["status"], Issue.Status.IN_REVIEW)
+
+    def test_issue_status_update_creates_activity_log(self):
+        response = self.client.patch(
+            reverse("issue-detail", kwargs={"pk": self.issue.pk}),
+            {"status": Issue.Status.DONE},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(
+            ActivityLog.objects.filter(
+                issue=self.issue,
+                action="Status updated",
+                details__from=Issue.Status.IN_REVIEW,
+                details__to=Issue.Status.DONE,
+            ).exists()
+        )
