@@ -1,3 +1,5 @@
+from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.utils.text import slugify
 from rest_framework import serializers
 
@@ -5,9 +7,39 @@ from .models import ActivityLog, Issue, Project, TeamMember
 
 
 class TeamMemberSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source="user.username", read_only=True)
+    login_username = serializers.CharField(write_only=True, required=True, max_length=150)
+    password = serializers.CharField(write_only=True, required=True, min_length=8)
+
+    def validate_login_username(self, value):
+        if get_user_model().objects.filter(username=value).exists():
+            raise serializers.ValidationError("A user with this username already exists.")
+        return value
+
+    @transaction.atomic
+    def create(self, validated_data):
+        username = validated_data.pop("login_username")
+        password = validated_data.pop("password")
+        user = get_user_model().objects.create_user(username=username, password=password)
+        return TeamMember.objects.create(user=user, **validated_data)
+
     class Meta:
         model = TeamMember
-        fields = ["id", "name", "role", "email", "created_at", "updated_at"]
+        fields = [
+            "id",
+            "name",
+            "role",
+            "email",
+            "username",
+            "login_username",
+            "password",
+            "created_at",
+            "updated_at",
+        ]
+        extra_kwargs = {
+            "login_username": {"write_only": True},
+            "password": {"write_only": True},
+        }
 
 
 class ProjectSerializer(serializers.ModelSerializer):

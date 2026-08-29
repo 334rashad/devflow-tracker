@@ -89,6 +89,45 @@ class IssueApiTests(APITestCase):
             ).exists()
         )
 
+    def test_staff_can_create_member_with_login_account(self):
+        staff_user = get_user_model().objects.create_user(
+            username="admin",
+            password="admin123",
+            is_staff=True,
+        )
+        self.client.force_authenticate(user=staff_user)
+
+        response = self.client.post(
+            reverse("team-member-list"),
+            {
+                "name": "Jordan Lee",
+                "role": "QA Engineer",
+                "email": "jordan@devflow.local",
+                "login_username": "jordan",
+                "password": "testpass123",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["username"], "jordan")
+        self.assertTrue(get_user_model().objects.get(username="jordan").check_password("testpass123"))
+
+    def test_regular_user_cannot_create_team_member(self):
+        response = self.client.post(
+            reverse("team-member-list"),
+            {
+                "name": "Jordan Lee",
+                "role": "QA Engineer",
+                "email": "jordan@devflow.local",
+                "login_username": "jordan",
+                "password": "testpass123",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_login_endpoint_sets_csrf_cookie(self):
         response = self.client.get(reverse("auth-login"))
 

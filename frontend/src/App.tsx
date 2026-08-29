@@ -21,6 +21,14 @@ type TeamMember = {
   id: number;
   name: string;
   role: string;
+  email: string;
+  username?: string;
+};
+
+type CurrentUser = {
+  username: string;
+  name: string | null;
+  is_staff: boolean;
 };
 
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
@@ -71,6 +79,7 @@ export default function App() {
   const [password, setPassword] = useState("admin123");
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [isCreatingIssue, setIsCreatingIssue] = useState(false);
   const [createError, setCreateError] = useState("");
   const [draftIssue, setDraftIssue] = useState({
@@ -79,6 +88,15 @@ export default function App() {
     project: "",
     priority: "medium",
     assignee: "",
+  });
+  const [isManagingTeam, setIsManagingTeam] = useState(false);
+  const [memberError, setMemberError] = useState("");
+  const [draftMember, setDraftMember] = useState({
+    name: "",
+    role: "",
+    email: "",
+    login_username: "",
+    password: "",
   });
 
   const fetchJson = async (input: string, init: RequestInit = {}) => {
@@ -166,6 +184,7 @@ export default function App() {
           const payload = await response.json();
           if (payload.authenticated) {
             setIsAuthenticated(true);
+            setCurrentUser(payload.user ?? null);
           }
         }
       } catch (error) {
@@ -198,10 +217,12 @@ export default function App() {
       }
 
       setIsAuthenticated(true);
+      setCurrentUser(payload.user ?? null);
       await loadData();
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : "Failed to sign in.");
       setIsAuthenticated(false);
+      setCurrentUser(null);
     } finally {
       setAuthLoading(false);
     }
@@ -288,6 +309,30 @@ export default function App() {
     }
   };
 
+  const createTeamMember = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setMemberError("");
+
+    if (Object.values(draftMember).some((value) => !value.trim())) {
+      setMemberError("Complete every field to create a member account.");
+      return;
+    }
+
+    try {
+      const response = await fetchJson(`/team-members/`, {
+        method: "POST",
+        headers: { "X-CSRFToken": getCsrfToken() },
+        body: JSON.stringify(draftMember),
+      });
+      const created = await response.json();
+      setTeamMembers((current) => [...current, created].sort((left, right) => left.name.localeCompare(right.name)));
+      setDraftMember({ name: "", role: "", email: "", login_username: "", password: "" });
+      setIsManagingTeam(false);
+    } catch (error) {
+      setMemberError(error instanceof Error ? error.message : "Failed to create the member account.");
+    }
+  };
+
   const issueList = Array.isArray(issues) ? issues : [];
   const activityList = Array.isArray(activity) ? activity : [];
 
@@ -297,6 +342,10 @@ export default function App() {
     { label: "In progress", value: stats.in_progress_issues ?? 0, delta: "active work" },
     { label: "Projects", value: stats.projects ?? 0, delta: "tracked" },
   ];
+  const memberWorkload = teamMembers.map((member) => ({
+    ...member,
+    activeIssues: issues.filter((issue) => issue.assignee === member.id && issue.status !== "done").length,
+  }));
 
   if (!isAuthenticated) {
     return (
@@ -540,6 +589,40 @@ export default function App() {
             )}
           </ul>
         </article>
+
+        {currentUser?.is_staff ? (
+          <article className="surface team-panel">
+            <div className="section-header">
+              <h2>Team workload</h2>
+              <button type="button" className="command-button" onClick={() => setIsManagingTeam((current) => !current)}>
+                {isManagingTeam ? "Close" : "Add member"}
+              </button>
+            </div>
+
+            {isManagingTeam ? (
+              <form className="issue-form" onSubmit={createTeamMember}>
+                <div className="issue-form-grid member-form-grid">
+                  <input value={draftMember.name} onChange={(event) => setDraftMember((current) => ({ ...current, name: event.target.value }))} placeholder="Full name" />
+                  <input value={draftMember.role} onChange={(event) => setDraftMember((current) => ({ ...current, role: event.target.value }))} placeholder="Role" />
+                  <input type="email" value={draftMember.email} onChange={(event) => setDraftMember((current) => ({ ...current, email: event.target.value }))} placeholder="Work email" />
+                  <input value={draftMember.login_username} onChange={(event) => setDraftMember((current) => ({ ...current, login_username: event.target.value }))} placeholder="Login username" />
+                  <input type="password" value={draftMember.password} onChange={(event) => setDraftMember((current) => ({ ...current, password: event.target.value }))} placeholder="Temporary password" />
+                </div>
+                {memberError ? <p className="auth-error">{memberError}</p> : null}
+                <button className="command-button" type="submit">Create member account</button>
+              </form>
+            ) : null}
+
+            <div className="workload-list">
+              {memberWorkload.map((member) => (
+                <div className="workload-row" key={member.id}>
+                  <div><strong>{member.name}</strong><small>{member.role}</small></div>
+                  <span>{member.activeIssues} active</span>
+                </div>
+              ))}
+            </div>
+          </article>
+        ) : null}
       </section>
     </main>
   );

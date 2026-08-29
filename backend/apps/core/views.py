@@ -2,7 +2,7 @@ from django.contrib.auth import authenticate, login
 from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework import viewsets
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -36,6 +36,7 @@ class LoginView(APIView):
                     "id": user.id,
                     "username": user.username,
                     "name": team_member.name if team_member else None,
+                    "is_staff": user.is_staff,
                 },
             }
         )
@@ -45,6 +46,10 @@ class TeamMemberViewSet(viewsets.ModelViewSet):
     queryset = TeamMember.objects.all().order_by("name")
     serializer_class = TeamMemberSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        permission_classes = [IsAuthenticated] if self.action in {"list", "retrieve"} else [IsAdminUser]
+        return [permission() for permission in permission_classes]
 
 
 class ProjectViewSet(viewsets.ModelViewSet):

@@ -203,6 +203,47 @@ h1 {
   justify-self: start;
 }
 
+.team-panel {
+  grid-column: 1 / -1;
+}
+
+.member-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.workload-list {
+  display: grid;
+  gap: 10px;
+}
+
+.workload-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.workload-row:last-child {
+  border-bottom: 0;
+}
+
+.workload-row div {
+  display: grid;
+  gap: 4px;
+}
+
+.workload-row small {
+  color: #9bb0d0;
+}
+
+.workload-row span {
+  color: #86efac;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
 .issue-list,
 .activity-list {
   display: grid;
@@ -336,6 +377,10 @@ h1 {
   }
 
   .issue-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .member-form-grid {
     grid-template-columns: 1fr;
   }
 
