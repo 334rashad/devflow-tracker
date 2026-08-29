@@ -85,7 +85,7 @@ export default function App() {
   const [status, setStatus] = useState("all");
   const [priority, setPriority] = useState("all");
   const [loading, setLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("admin123");
   const [authError, setAuthError] = useState("");
@@ -200,6 +200,8 @@ export default function App() {
         }
       } catch (error) {
         console.warn("Session bootstrap not available yet.", error);
+      } finally {
+        setIsAuthenticated((current) => current ?? false);
       }
     };
 
@@ -347,6 +349,24 @@ export default function App() {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await fetchJson(`/auth/logout/`, {
+        method: "POST",
+        headers: { "X-CSRFToken": getCsrfToken() },
+      });
+    } catch (error) {
+      console.error("Failed to end session", error);
+    } finally {
+      setIsAuthenticated(false);
+      setCurrentUser(null);
+      setSelectedIssueId(null);
+      setSelectedIssue(null);
+      setIssues([]);
+      setActivity([]);
+    }
+  };
+
   const issueList = Array.isArray(issues) ? issues : [];
   const activityList = Array.isArray(activity) ? activity : [];
 
@@ -360,6 +380,14 @@ export default function App() {
     ...member,
     activeIssues: issues.filter((issue) => issue.assignee === member.id && issue.status !== "done").length,
   }));
+
+  if (isAuthenticated === null) {
+    return (
+      <main className="app-shell auth-shell">
+        <div className="auth-card surface session-loading">Restoring your workspace...</div>
+      </main>
+    );
+  }
 
   if (!isAuthenticated) {
     return (
@@ -397,6 +425,10 @@ export default function App() {
 
   return (
     <main className="app-shell">
+      <div className="session-bar">
+        <span>Signed in as <strong>{currentUser?.username}</strong>{currentUser?.is_staff ? " (admin)" : ""}</span>
+        <button type="button" className="text-button" onClick={handleLogout}>Log out</button>
+      </div>
       <section className="hero">
         <div>
           <p className="eyebrow">DevFlow & BugSync</p>

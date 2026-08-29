@@ -1,4 +1,4 @@
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate, login, logout
 from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework import viewsets
@@ -44,6 +44,14 @@ class LoginView(APIView):
 
         login(request, user)
         return Response(auth_payload(user))
+
+
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        logout(request)
+        return Response({"authenticated": False})
 
 
 class TeamMemberViewSet(viewsets.ModelViewSet):
