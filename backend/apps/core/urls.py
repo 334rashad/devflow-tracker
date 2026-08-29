@@ -2,7 +2,7 @@ from rest_framework.routers import DefaultRouter
 
 from django.urls import path
 
-from .views import ActivityLogViewSet, DashboardStatsView, IssueViewSet, LoginView, LogoutView, ProjectViewSet, TeamMemberViewSet
+from .views import ActivityLogViewSet, DashboardStatsView, DeliveryAnalyticsView, IssueViewSet, LoginView, LogoutView, ProjectViewSet, TeamMemberViewSet
 
 router = DefaultRouter()
 router.register(r"team-members", TeamMemberViewSet, basename="team-member")
@@ -15,4 +15,7 @@ urlpatterns = [
     path("auth/logout/", LogoutView.as_view(), name="auth-logout"),
 ]
 urlpatterns += router.urls
-urlpatterns += [path("dashboard/", DashboardStatsView.as_view(), name="dashboard-stats")]
+urlpatterns += [
+    path("dashboard/", DashboardStatsView.as_view(), name="dashboard-stats"),
+    path("analytics/", DeliveryAnalyticsView.as_view(), name="delivery-analytics"),
+]

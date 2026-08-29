@@ -49,6 +49,20 @@ class IssueApiTests(APITestCase):
         self.assertEqual(response.data["count"], 1)
         self.assertEqual(response.data["results"][0]["status"], Issue.Status.IN_REVIEW)
 
+    def test_delivery_analytics_returns_scoped_health_metrics(self):
+        response = self.client.get(reverse("delivery-analytics"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status_distribution"], [
+            {"status": "todo", "count": 1},
+            {"status": "in_progress", "count": 0},
+            {"status": "in_review", "count": 1},
+            {"status": "blocked", "count": 0},
+            {"status": "done", "count": 0},
+        ])
+        self.assertEqual(response.data["workload"], [{"member": "Ava Chen", "active_issues": 2}])
+        self.assertEqual(response.data["risks"], {"blocked_issues": 0, "overdue_issues": 0, "completion_rate": 0})
+
     def test_issue_status_update_creates_activity_log(self):
         response = self.client.patch(
             reverse("issue-detail", kwargs={"pk": self.issue.pk}),

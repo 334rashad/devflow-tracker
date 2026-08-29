@@ -25,6 +25,19 @@ def auth_payload(user):
     }
 
 
+def issue_queryset_for_user(user):
+    queryset = Issue.objects.select_related("project", "assignee").all().order_by("-created_at")
+
+    if user.is_staff:
+        return queryset
+
+    team_member = getattr(user, "team_member", None)
+    if team_member is None:
+        return queryset.none()
+
+    return queryset.filter(Q(assignee=team_member) | Q(project__owner=team_member))
+
+
 class LoginView(APIView):
     permission_classes = [AllowAny]
 
@@ -77,17 +90,7 @@ class IssueViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        queryset = Issue.objects.select_related("project", "assignee").all().order_by("-created_at")
-        user = self.request.user
-
-        if user.is_staff:
-            return queryset
-
-        team_member = getattr(user, "team_member", None)
-        if team_member is None:
-            return queryset.none()
-
-        return queryset.filter(Q(assignee=team_member) | Q(project__owner=team_member))
+        return issue_queryset_for_user(self.request.user)
 
     def _activity_actor(self, issue):
         return getattr(self.request.user, "team_member", None) or issue.assignee
@@ -148,9 +151,11 @@ class ActivityLogViewSet(viewsets.ModelViewSet):
 
 class DashboardStatsView(APIView):
     permission_classes = [IsAuthenticated]
+
     def get(self, request):
         today = timezone.localdate()
-        issue_counts = Issue.objects.aggregate(
+        issues = issue_queryset_for_user(request.user)
+        issue_counts = issues.aggregate(
             open_issues=Count("id", filter=~Q(status=Issue.Status.DONE)),
             blocked_issues=Count("id", filter=Q(status=Issue.Status.BLOCKED)),
             in_progress_issues=Count("id", filter=Q(status=Issue.Status.IN_PROGRESS)),
@@ -159,10 +164,62 @@ class DashboardStatsView(APIView):
         )
 
         payload = {
-            "projects": Project.objects.count(),
-            "team_members": TeamMember.objects.count(),
-            "issues": Issue.objects.count(),
-            "activity_today": ActivityLog.objects.filter(created_at__date=today).count(),
+            "projects": issues.values("project_id").distinct().count(),
+            "team_members": issues.exclude(assignee__isnull=True).values("assignee_id").distinct().count(),
+            "issues": issues.count(),
+            "activity_today": ActivityLog.objects.filter(issue__in=issues, created_at__date=today).count(),
             **issue_counts,
         }
         return Response(payload)
+
+
+class DeliveryAnalyticsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        today = timezone.localdate()
+        issues = issue_queryset_for_user(request.user)
+        total_issues = issues.count()
+
+        status_counts = dict(issues.values_list("status").annotate(total=Count("id")))
+        priority_counts = dict(issues.values_list("priority").annotate(total=Count("id")))
+        project_rows = issues.values("project__name").annotate(
+            total=Count("id"),
+            completed=Count("id", filter=Q(status=Issue.Status.DONE)),
+            blocked=Count("id", filter=Q(status=Issue.Status.BLOCKED)),
+        ).order_by("project__name")
+        workload = issues.exclude(assignee__isnull=True).exclude(status=Issue.Status.DONE).values(
+            "assignee__name"
+        ).annotate(active_issues=Count("id")).order_by("-active_issues", "assignee__name")
+
+        return Response(
+            {
+                "status_distribution": [
+                    {"status": status, "count": status_counts.get(status, 0)}
+                    for status, _ in Issue.Status.choices
+                ],
+                "priority_distribution": [
+                    {"priority": priority, "count": priority_counts.get(priority, 0)}
+                    for priority, _ in Issue.Priority.choices
+                ],
+                "project_health": [
+                    {
+                        "project": row["project__name"],
+                        "total_issues": row["total"],
+                        "blocked_issues": row["blocked"],
+                        "completion_rate": round(row["completed"] / row["total"] * 100) if row["total"] else 0,
+                    }
+                    for row in project_rows
+                ],
+                "workload": [
+                    {"member": row["assignee__name"], "active_issues": row["active_issues"]} for row in workload
+                ],
+                "risks": {
+                    "blocked_issues": issues.filter(status=Issue.Status.BLOCKED).count(),
+                    "overdue_issues": issues.filter(due_date__lt=today).exclude(status=Issue.Status.DONE).count(),
+                    "completion_rate": round(issues.filter(status=Issue.Status.DONE).count() / total_issues * 100)
+                    if total_issues
+                    else 0,
+                },
+            }
+        )
