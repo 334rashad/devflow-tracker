@@ -127,6 +127,27 @@ h1 {
   font-size: 1.2rem;
 }
 
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.command-button {
+  border: 1px solid rgba(125, 211, 252, 0.35);
+  border-radius: 8px;
+  background: rgba(14, 116, 144, 0.28);
+  color: #e0f2fe;
+  padding: 9px 12px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.command-button:hover {
+  background: rgba(14, 116, 144, 0.45);
+}
+
 .filters {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(120px, 0.7fr));
@@ -143,6 +164,43 @@ h1 {
   border-radius: 12px;
   padding: 12px 14px;
   font: inherit;
+}
+
+.issue-form {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 16px;
+  border: 1px solid rgba(125, 211, 252, 0.18);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.issue-form input,
+.issue-form select,
+.issue-form textarea {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 8px;
+  background: rgba(8, 16, 30, 0.8);
+  color: #e2e8f0;
+  padding: 11px 12px;
+  font: inherit;
+}
+
+.issue-form textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.issue-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.issue-form .command-button {
+  justify-self: start;
 }
 
 .issue-list,
@@ -274,6 +332,10 @@ h1 {
   }
 
   .filters {
+    grid-template-columns: 1fr;
+  }
+
+  .issue-form-grid {
     grid-template-columns: 1fr;
   }
 

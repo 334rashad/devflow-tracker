@@ -13,6 +13,12 @@ from .serializers import ActivityLogSerializer, IssueSerializer, ProjectSerializ
 class LoginView(APIView):
     permission_classes = [AllowAny]
 
+    def get(self, request):
+        from django.middleware.csrf import get_token
+
+        get_token(request)
+        return Response({"authenticated": request.user.is_authenticated})
+
     def post(self, request):
         username = request.data.get("username")
         password = request.data.get("password")
@@ -66,17 +72,41 @@ class IssueViewSet(viewsets.ModelViewSet):
 
         return queryset.filter(Q(assignee=team_member) | Q(project__owner=team_member))
 
+    def _activity_actor(self, issue):
+        return getattr(self.request.user, "team_member", None) or issue.assignee
+
+    def perform_create(self, serializer):
+        issue = serializer.save()
+        ActivityLog.objects.create(
+            issue=issue,
+            actor=self._activity_actor(issue),
+            action="Issue created",
+            details={"status": issue.status},
+        )
+
     def perform_update(self, serializer):
         issue = self.get_object()
         previous_status = issue.status
+        previous_assignee = issue.assignee
         updated_issue = serializer.save()
 
         if previous_status != updated_issue.status:
             ActivityLog.objects.create(
                 issue=updated_issue,
-                actor=updated_issue.assignee,
+                actor=self._activity_actor(updated_issue),
                 action="Status updated",
                 details={"from": previous_status, "to": updated_issue.status},
+            )
+
+        if previous_assignee != updated_issue.assignee:
+            ActivityLog.objects.create(
+                issue=updated_issue,
+                actor=self._activity_actor(updated_issue),
+                action="Assignee updated",
+                details={
+                    "from": previous_assignee.name if previous_assignee else "Unassigned",
+                    "to": updated_issue.assignee.name if updated_issue.assignee else "Unassigned",
+                },
             )
 
 

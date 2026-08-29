@@ -66,6 +66,35 @@ class IssueApiTests(APITestCase):
             ).exists()
         )
 
+    def test_issue_create_generates_slug_and_activity_log(self):
+        response = self.client.post(
+            reverse("issue-list"),
+            {
+                "project": self.project.pk,
+                "title": "Investigate delayed webhooks",
+                "description": "Find the source of delivery lag.",
+                "status": Issue.Status.TODO,
+                "priority": Issue.Priority.HIGH,
+                "assignee": self.member.pk,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["slug"], "investigate-delayed-webhooks")
+        self.assertTrue(
+            ActivityLog.objects.filter(
+                issue_id=response.data["id"],
+                action="Issue created",
+            ).exists()
+        )
+
+    def test_login_endpoint_sets_csrf_cookie(self):
+        response = self.client.get(reverse("auth-login"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("csrftoken", response.cookies)
+
     def test_login_endpoint_authenticates_user_and_scopes_issues(self):
         login_client = APIClient()
         login_response = login_client.post(
