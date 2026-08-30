@@ -1,20 +1,112 @@
 # DevFlow & BugSync
 
-Engineering team metrics and issue tracking dashboard built with Django, React, and Docker.
+DevFlow & BugSync is an internal engineering workspace for tracking issue delivery, team workload, and release risk. It combines a scoped issue queue with delivery-health analytics, staff account management, and an audit timeline for workflow changes.
+
+## Highlights
+
+- Session-authenticated React dashboard backed by Django REST Framework.
+- Team-scoped issue access for regular users and full organization access for staff.
+- Search, status and priority filters, issue creation, assignment, and complete issue editing.
+- Activity history for creation, status, assignee, title, description, priority, project, and due-date changes.
+- Delivery-health analytics for workflow distribution, priority mix, workload, project completion, blocked work, and overdue work.
+- Staff-only team management that creates a Django login account and linked product profile together.
 
 ## Stack
 
-- Backend: Django + Django REST Framework
-- Frontend: React + TypeScript + Vite
-- Database: PostgreSQL
-- Local dev: Docker Compose
+- Backend: Django 5, Django REST Framework, django-filter, drf-spectacular.
+- Frontend: React 18, TypeScript, Vite.
+- Database: SQLite for local development, PostgreSQL supported through Docker Compose.
 
-## Build Focus
+## Architecture
 
-This repo is being built as a polished portfolio project with a real product feel:
+```text
+React + Vite (localhost:5173)
+		  |
+		  | session cookie + CSRF token
+		  v
+Django REST API (localhost:8000/api)
+		  |
+		  v
+SQLite locally / PostgreSQL in Docker
+```
 
-- issue tracking
-- engineering metrics
-- team activity timeline
-- filters, status changes, and search
-- auth-ready architecture
+The Django `User` is the authentication account. A `TeamMember` is the application profile linked one-to-one to a user and used for issue assignment and scoped visibility.
+
+## Run Locally
+
+Prerequisites: Python 3.12+ and Node.js 20+.
+
+```powershell
+git clone <your-repository-url>
+cd devflow-tracker
+Copy-Item .env.example .env
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r backend\requirements.txt
+python backend\manage.py migrate
+python backend\manage.py seed_demo_data
+python backend\manage.py createsuperuser
+```
+
+In a second terminal:
+
+```powershell
+cd devflow-tracker\frontend
+npm install
+npm run dev
+```
+
+Start the backend in the first terminal:
+
+```powershell
+python backend\manage.py runserver
+```
+
+Open the dashboard at http://localhost:5173 and the API documentation at http://localhost:8000/api/docs/.
+
+## Demo Flow
+
+1. Sign in with the superuser you created, or use the existing local demo account `admin` / `admin123` when available.
+2. Create a new issue, assign it, and change its status.
+3. Open the issue detail panel to edit title, priority, due date, project, or description.
+4. Check the activity feed and delivery-health panel to see the workflow updates reflected in the product.
+5. As staff, use **Team workload** to create a member and their frontend login account.
+
+## Access Model
+
+- Staff users can see all work, manage member accounts, and access Django Admin at http://localhost:8000/admin/.
+- Team members see issues assigned to them or in projects they own.
+- To switch frontend users, use the dashboard **Log out** control. Django Admin shares the same backend session, so use a private browser window or separate profile when testing two accounts simultaneously.
+
+## Optional PostgreSQL
+
+Start the local database container:
+
+```powershell
+docker compose up -d db
+```
+
+Then update `.env`:
+
+```dotenv
+DATABASE_URL=postgres://devflow:devflow@localhost:5432/devflow
+POSTGRES_DB=devflow
+POSTGRES_USER=devflow
+POSTGRES_PASSWORD=devflow
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+```
+
+Run migrations again after changing databases.
+
+## Environment Variables
+
+Copy `.env.example` to `.env` for local configuration. In a deployed environment, set `DEBUG=0`, use a strong unique `SECRET_KEY`, and set `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, and `VITE_API_BASE_URL` to the deployed URLs.
+
+## Validation
+
+```powershell
+python backend\manage.py test apps.core.tests
+cd frontend
+npm run build
+```
