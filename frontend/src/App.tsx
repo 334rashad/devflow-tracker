@@ -6,10 +6,12 @@ type Issue = {
   slug: string;
   status: string;
   priority: string;
+  project?: number;
   project_name?: string;
   assignee?: number | null;
   assignee_name?: string;
   description?: string;
+  due_date?: string | null;
 };
 
 type Project = {
@@ -108,6 +110,16 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [isCreatingIssue, setIsCreatingIssue] = useState(false);
   const [createError, setCreateError] = useState("");
+  const [isEditingIssue, setIsEditingIssue] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [editIssue, setEditIssue] = useState({
+    title: "",
+    description: "",
+    project: "",
+    priority: "medium",
+    assignee: "",
+    due_date: "",
+  });
   const [draftIssue, setDraftIssue] = useState({
     title: "",
     description: "",
@@ -303,8 +315,47 @@ export default function App() {
       const refreshedActivity = await fetchJson(`/activity/?page_size=5`);
       const nextActivity = await refreshedActivity.json();
       setActivity(normalizeList<Record<string, unknown>>(nextActivity));
+      await loadData();
+      return updated as Issue;
     } catch (error) {
       console.error("Failed to update issue", error);
+      throw error;
+    }
+  };
+
+  const beginEditingIssue = () => {
+    if (!selectedIssue) return;
+    setEditError("");
+    setEditIssue({
+      title: selectedIssue.title,
+      description: selectedIssue.description ?? "",
+      project: String(selectedIssue.project ?? ""),
+      priority: selectedIssue.priority,
+      assignee: selectedIssue.assignee ? String(selectedIssue.assignee) : "",
+      due_date: selectedIssue.due_date ?? "",
+    });
+    setIsEditingIssue(true);
+  };
+
+  const saveIssueEdits = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedIssue || !editIssue.title.trim() || !editIssue.project) {
+      setEditError("A title and project are required.");
+      return;
+    }
+
+    try {
+      await updateIssue({
+        title: editIssue.title.trim(),
+        description: editIssue.description.trim(),
+        project: Number(editIssue.project),
+        priority: editIssue.priority,
+        assignee: editIssue.assignee ? Number(editIssue.assignee) : null,
+        due_date: editIssue.due_date || null,
+      });
+      setIsEditingIssue(false);
+    } catch (error) {
+      setEditError(error instanceof Error ? error.message : "Failed to save issue changes.");
     }
   };
 
@@ -590,43 +641,62 @@ export default function App() {
                   <p className="detail-label">{selectedIssue.slug}</p>
                   <h3>{selectedIssue.title}</h3>
                 </div>
-                <span className="detail-badge">{selectedIssue.priority}</span>
+                <div className="detail-header-actions">
+                  <span className={`detail-badge priority-${selectedIssue.priority}`}>{selectedIssue.priority}</span>
+                  <button type="button" className="text-button" onClick={beginEditingIssue}>Edit</button>
+                </div>
               </div>
 
-              <div className="detail-meta">
-                <span>{selectedIssue.project_name ?? "Platform"}</span>
-                <span>{selectedIssue.assignee_name ?? "Unassigned"}</span>
-              </div>
+              {isEditingIssue ? (
+                <form className="issue-form detail-edit-form" onSubmit={saveIssueEdits}>
+                  <label>Title<input value={editIssue.title} onChange={(event) => setEditIssue((current) => ({ ...current, title: event.target.value }))} /></label>
+                  <label>Description<textarea value={editIssue.description} onChange={(event) => setEditIssue((current) => ({ ...current, description: event.target.value }))} /></label>
+                  <div className="issue-form-grid">
+                    <label>Project<select value={editIssue.project} onChange={(event) => setEditIssue((current) => ({ ...current, project: event.target.value }))}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
+                    <label>Priority<select value={editIssue.priority} onChange={(event) => setEditIssue((current) => ({ ...current, priority: event.target.value }))}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select></label>
+                    <label>Due date<input type="date" value={editIssue.due_date} onChange={(event) => setEditIssue((current) => ({ ...current, due_date: event.target.value }))} /></label>
+                  </div>
+                  <label>Assignee<select value={editIssue.assignee} onChange={(event) => setEditIssue((current) => ({ ...current, assignee: event.target.value }))}><option value="">Unassigned</option>{teamMembers.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select></label>
+                  {editError ? <p className="auth-error">{editError}</p> : null}
+                  <div className="form-actions"><button type="button" className="text-button" onClick={() => setIsEditingIssue(false)}>Cancel</button><button className="command-button" type="submit">Save changes</button></div>
+                </form>
+              ) : <>
+                <div className="detail-meta">
+                  <span>{selectedIssue.project_name ?? "Platform"}</span>
+                  <span>{selectedIssue.assignee_name ?? "Unassigned"}</span>
+                  <span>{selectedIssue.due_date ? `Due ${selectedIssue.due_date}` : "No due date"}</span>
+                </div>
 
-              <p className="detail-description">
-                {selectedIssue.description || "No additional description provided."}
-              </p>
+                <p className="detail-description">
+                  {selectedIssue.description || "No additional description provided."}
+                </p>
 
-              <div className="detail-actions">
-                <label>
-                  Status
-                  <select
-                    value={selectedIssue.status}
-                    onChange={(event) => updateIssue({ status: event.target.value })}
-                  >
-                    <option value="todo">Todo</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="in_review">In Review</option>
-                    <option value="blocked">Blocked</option>
-                    <option value="done">Done</option>
-                  </select>
-                </label>
-                <label>
-                  Assignee
-                  <select
-                    value={selectedIssue.assignee ?? ""}
-                    onChange={(event) => updateIssue({ assignee: event.target.value ? Number(event.target.value) : null })}
-                  >
-                    <option value="">Unassigned</option>
-                    {teamMembers.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
-                  </select>
-                </label>
-              </div>
+                <div className="detail-actions">
+                  <label>
+                    Status
+                    <select
+                      value={selectedIssue.status}
+                      onChange={(event) => updateIssue({ status: event.target.value })}
+                    >
+                      <option value="todo">Todo</option>
+                      <option value="in_progress">In Progress</option>
+                      <option value="in_review">In Review</option>
+                      <option value="blocked">Blocked</option>
+                      <option value="done">Done</option>
+                    </select>
+                  </label>
+                  <label>
+                    Assignee
+                    <select
+                      value={selectedIssue.assignee ?? ""}
+                      onChange={(event) => updateIssue({ assignee: event.target.value ? Number(event.target.value) : null })}
+                    >
+                      <option value="">Unassigned</option>
+                      {teamMembers.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
+                    </select>
+                  </label>
+                </div>
+              </>}
             </div>
           ) : (
             <p className="empty-state">Select an issue to review details and update its workflow.</p>
