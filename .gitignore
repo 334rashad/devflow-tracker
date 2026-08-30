@@ -8,6 +8,7 @@ __pycache__/
 .env
 .env.*
 !.env.example
+backend/staticfiles/
 node_modules/
 dist/
 build/

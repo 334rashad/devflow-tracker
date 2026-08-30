@@ -30,6 +30,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -67,6 +68,20 @@ if DATABASE_URL.startswith("sqlite"):
             "NAME": BASE_DIR / "db.sqlite3",
         }
     }
+elif DATABASE_URL.startswith("postgres"):
+    from urllib.parse import urlparse
+
+    parsed_url = urlparse(DATABASE_URL)
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": parsed_url.path.lstrip("/"),
+            "USER": parsed_url.username,
+            "PASSWORD": parsed_url.password,
+            "HOST": parsed_url.hostname,
+            "PORT": parsed_url.port or 5432,
+        }
+    }
 else:
     DATABASES = {
         "default": {
@@ -92,7 +107,18 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+if not DEBUG:
+    SECURE_SSL_REDIRECT = os.getenv("SECURE_SSL_REDIRECT", "1") == "1"
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",

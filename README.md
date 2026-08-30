@@ -117,6 +117,24 @@ POSTGRES_PORT=5432
 
 Run migrations again after changing databases.
 
+## Deployment
+
+The repo is configured to deploy as two services: a Django API and a static frontend build.
+
+- [render.yaml](render.yaml) defines both services plus a managed Postgres database for one-click deployment on [Render](https://render.com).
+- [backend/Procfile](backend/Procfile) works as a generic fallback for Heroku-style platforms (Railway, Heroku).
+- The backend serves its own static assets via `whitenoise`, so no separate static file host is required.
+- Production security settings (`SECURE_SSL_REDIRECT`, secure cookies) activate automatically when `DEBUG=0`.
+
+To deploy on Render:
+
+1. Push this repository to GitHub.
+2. In the Render dashboard, choose **New > Blueprint** and point it at the repository. Render reads `render.yaml` and provisions the database, backend, and frontend together.
+3. After the first deploy, update the backend's `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, and `CSRF_TRUSTED_ORIGINS` to match the actual generated frontend URL, and update the frontend's `VITE_API_BASE_URL` to match the actual backend URL.
+4. Run `python manage.py seed_demo_data` and `python manage.py createsuperuser` from the Render shell for the backend service.
+
+Deploying requires your own hosting account credentials, so this step has to be run by you rather than automated here.
+
 ## Environment Variables
 
 Copy `.env.example` to `.env` for local configuration. In a deployed environment, set `DEBUG=0`, use a strong unique `SECRET_KEY`, and set `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, and `VITE_API_BASE_URL` to the deployed URLs.
