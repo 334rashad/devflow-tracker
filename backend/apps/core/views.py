@@ -108,6 +108,11 @@ class IssueViewSet(viewsets.ModelViewSet):
         issue = self.get_object()
         previous_status = issue.status
         previous_assignee = issue.assignee
+        previous_title = issue.title
+        previous_description = issue.description
+        previous_priority = issue.priority
+        previous_project = issue.project
+        previous_due_date = issue.due_date
         updated_issue = serializer.save()
 
         if previous_status != updated_issue.status:
@@ -128,6 +133,26 @@ class IssueViewSet(viewsets.ModelViewSet):
                     "to": updated_issue.assignee.name if updated_issue.assignee else "Unassigned",
                 },
             )
+
+        changes = [
+            ("title", previous_title, updated_issue.title),
+            ("description", previous_description, updated_issue.description),
+            ("priority", previous_priority, updated_issue.priority),
+            ("project", previous_project.name, updated_issue.project.name),
+            (
+                "due date",
+                previous_due_date.isoformat() if previous_due_date else "No due date",
+                updated_issue.due_date.isoformat() if updated_issue.due_date else "No due date",
+            ),
+        ]
+        for field, previous_value, updated_value in changes:
+            if previous_value != updated_value:
+                ActivityLog.objects.create(
+                    issue=updated_issue,
+                    actor=self._activity_actor(updated_issue),
+                    action=f"Issue {field} updated",
+                    details={"from": previous_value, "to": updated_value},
+                )
 
 
 class ActivityLogViewSet(viewsets.ModelViewSet):

@@ -80,6 +80,30 @@ class IssueApiTests(APITestCase):
             ).exists()
         )
 
+    def test_issue_detail_update_creates_activity_entries(self):
+        response = self.client.patch(
+            reverse("issue-detail", kwargs={"pk": self.issue.pk}),
+            {
+                "title": "Stabilize auth refresh flow",
+                "description": "Remove duplicate refresh calls under load.",
+                "priority": Issue.Priority.CRITICAL,
+                "due_date": "2026-09-15",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        entries = ActivityLog.objects.filter(issue=self.issue).values_list("action", flat=True)
+        self.assertCountEqual(
+            entries,
+            [
+                "Issue title updated",
+                "Issue description updated",
+                "Issue priority updated",
+                "Issue due date updated",
+            ],
+        )
+
     def test_issue_create_generates_slug_and_activity_log(self):
         response = self.client.post(
             reverse("issue-list"),
