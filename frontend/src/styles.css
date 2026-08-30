@@ -314,6 +314,18 @@ h1 {
   justify-self: start;
 }
 
+.load-more-button {
+  width: 100%;
+  margin-top: 14px;
+  text-align: center;
+  justify-self: stretch;
+}
+
+.load-more-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
 .team-panel {
   grid-column: 1 / -1;
 }

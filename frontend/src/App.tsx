@@ -102,6 +102,10 @@ export default function App() {
   const [status, setStatus] = useState("all");
   const [priority, setPriority] = useState("all");
   const [loading, setLoading] = useState(true);
+  const [issuesPage, setIssuesPage] = useState(1);
+  const [issuesCount, setIssuesCount] = useState(0);
+  const [hasMoreIssues, setHasMoreIssues] = useState(false);
+  const [loadingMoreIssues, setLoadingMoreIssues] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("admin123");
@@ -193,6 +197,9 @@ export default function App() {
       const nextIssues = normalizeList<Issue>(issuesPayload);
       const nextProjects = normalizeList<Project>(projectsPayload);
       setIssues(nextIssues);
+      setIssuesPage(1);
+      setIssuesCount(typeof issuesPayload?.count === "number" ? issuesPayload.count : nextIssues.length);
+      setHasMoreIssues(Boolean(issuesPayload?.next));
       setStats(statsPayload ?? {});
       setActivity(normalizeList<Record<string, unknown>>(activityPayload));
       setProjects(nextProjects);
@@ -211,6 +218,29 @@ export default function App() {
       console.error("Failed to load DevFlow data", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMoreIssues = async () => {
+    const nextPage = issuesPage + 1;
+    const query = new URLSearchParams();
+    if (search) query.set("search", search);
+    if (status !== "all") query.set("status", status);
+    if (priority !== "all") query.set("priority", priority);
+    query.set("page", String(nextPage));
+
+    setLoadingMoreIssues(true);
+    try {
+      const response = await fetchJson(`/issues/?${query.toString()}`);
+      const payload = await response.json();
+      const nextIssues = normalizeList<Issue>(payload);
+      setIssues((current) => [...current, ...nextIssues]);
+      setIssuesPage(nextPage);
+      setHasMoreIssues(Boolean(payload?.next));
+    } catch (error) {
+      console.error("Failed to load more issues", error);
+    } finally {
+      setLoadingMoreIssues(false);
     }
   };
 
@@ -604,7 +634,11 @@ export default function App() {
             {loading ? (
               <p className="empty-state">Loading issues…</p>
             ) : issueList.length === 0 ? (
-              <p className="empty-state">No issues match the current filter.</p>
+              <p className="empty-state">
+                {search || status !== "all" || priority !== "all"
+                  ? "No issues match your search or filters. Try clearing them."
+                  : "No issues yet. Use \"New issue\" to create the first one."}
+              </p>
             ) : (
               issueList.map((issue: Issue) => (
                 <button
@@ -626,6 +660,12 @@ export default function App() {
               ))
             )}
           </div>
+
+          {hasMoreIssues ? (
+            <button type="button" className="command-button load-more-button" onClick={loadMoreIssues} disabled={loadingMoreIssues}>
+              {loadingMoreIssues ? "Loading…" : `Load more (${issueList.length} of ${issuesCount})`}
+            </button>
+          ) : null}
         </article>
 
         <article className="surface detail-panel">
