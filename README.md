@@ -38,49 +38,46 @@ DevFlow & BugSync is an internal engineering workspace for tracking issue delive
 ## Architecture
 
 ```text
-React + Vite (localhost:5173)
+React + Vite container (localhost:5173)
 		  |
 		  | session cookie + CSRF token
 		  v
-Django REST API (localhost:8000/api)
+Django REST API container (localhost:8000/api)
 		  |
 		  v
-SQLite locally / PostgreSQL in Docker
+PostgreSQL container
 ```
 
 The Django `User` is the authentication account. A `TeamMember` is the application profile linked one-to-one to a user and used for issue assignment and scoped visibility.
 
-## Run Locally
+## Run With Docker
 
-Prerequisites: Python 3.12+ and Node.js 20+.
+Prerequisite: [Docker Desktop](https://www.docker.com/products/docker-desktop/) running with Linux containers enabled.
 
 ```powershell
 git clone <your-repository-url>
 cd devflow-tracker
 Copy-Item .env.example .env
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r backend\requirements.txt
-python backend\manage.py migrate
-python backend\manage.py seed_demo_data
-python backend\manage.py createsuperuser
+docker compose up --build
 ```
 
-In a second terminal:
+Compose starts PostgreSQL, runs Django migrations, and exposes the backend and frontend with source-mounted development servers. Open the dashboard at http://localhost:5173 and API documentation at http://localhost:8000/api/docs/.
+
+In a second terminal, create the demo records and an optional admin account:
 
 ```powershell
-cd devflow-tracker\frontend
-npm install
-npm run dev
+docker compose exec backend python manage.py seed_demo_data
+docker compose exec backend python manage.py createsuperuser
 ```
 
-Start the backend in the first terminal:
+To run the stack in the background or stop it:
 
 ```powershell
-python backend\manage.py runserver
+docker compose up --build -d
+docker compose down
 ```
 
-Open the dashboard at http://localhost:5173 and the API documentation at http://localhost:8000/api/docs/.
+The `postgres_data` and `frontend_node_modules` Docker volumes retain their data between restarts. To reset all local container data, run `docker compose down --volumes`.
 
 ## Demo Flow
 
@@ -95,27 +92,6 @@ Open the dashboard at http://localhost:5173 and the API documentation at http://
 - Staff users can see all work, manage member accounts, and access Django Admin at http://localhost:8000/admin/.
 - Team members see issues assigned to them or in projects they own.
 - To switch frontend users, use the dashboard **Log out** control. Django Admin shares the same backend session, so use a private browser window or separate profile when testing two accounts simultaneously.
-
-## Optional PostgreSQL
-
-Start the local database container:
-
-```powershell
-docker compose up -d db
-```
-
-Then update `.env`:
-
-```dotenv
-DATABASE_URL=postgres://devflow:devflow@localhost:5432/devflow
-POSTGRES_DB=devflow
-POSTGRES_USER=devflow
-POSTGRES_PASSWORD=devflow
-POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
-```
-
-Run migrations again after changing databases.
 
 ## Deployment
 
@@ -142,7 +118,7 @@ Copy `.env.example` to `.env` for local configuration. In a deployed environment
 ## Validation
 
 ```powershell
-python backend\manage.py test apps.core.tests
-cd frontend
-npm run build
+docker compose exec backend python manage.py test apps.core.tests
+docker compose exec frontend npm run test
+docker compose exec frontend npm run build
 ```
