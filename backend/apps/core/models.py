@@ -25,6 +25,7 @@ class Project(TimestampedModel):
     key = models.SlugField(unique=True)
     description = models.TextField(blank=True)
     owner = models.ForeignKey(TeamMember, on_delete=models.PROTECT, related_name="owned_projects")
+    members = models.ManyToManyField(TeamMember, blank=True, related_name="projects")
 
     def __str__(self) -> str:
         return self.name

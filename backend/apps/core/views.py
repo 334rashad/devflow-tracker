@@ -2,7 +2,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework import viewsets
-from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
+from rest_framework.permissions import AllowAny, BasePermission, IsAdminUser, IsAuthenticated, SAFE_METHODS
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -35,7 +35,50 @@ def issue_queryset_for_user(user):
     if team_member is None:
         return queryset.none()
 
-    return queryset.filter(Q(assignee=team_member) | Q(project__owner=team_member))
+    return queryset.filter(
+        Q(assignee=team_member) | Q(project__owner=team_member) | Q(project__members=team_member)
+    ).distinct()
+
+
+def project_queryset_for_user(user):
+    queryset = Project.objects.select_related("owner").all().order_by("name")
+    if user.is_staff:
+        return queryset
+
+    team_member = getattr(user, "team_member", None)
+    if team_member is None:
+        return queryset.none()
+
+    return queryset.filter(
+        Q(owner=team_member) | Q(members=team_member) | Q(issues__assignee=team_member)
+    ).distinct()
+
+
+class ProjectPermission(BasePermission):
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated)
+
+    def has_object_permission(self, request, view, obj):
+        if request.method in SAFE_METHODS or request.user.is_staff:
+            return True
+        return getattr(request.user, "team_member", None) == obj.owner
+
+
+class IssuePermission(BasePermission):
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated)
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.is_staff:
+            return True
+        team_member = getattr(request.user, "team_member", None)
+        if team_member is None:
+            return False
+        if request.method == "DELETE":
+            return obj.project.owner_id == team_member.id
+        return obj.assignee_id == team_member.id or obj.project.owner_id == team_member.id or obj.project.members.filter(
+            pk=team_member.pk
+        ).exists()
 
 
 class LoginView(APIView):
@@ -76,18 +119,34 @@ class TeamMemberViewSet(viewsets.ModelViewSet):
         permission_classes = [IsAuthenticated] if self.action in {"list", "retrieve"} else [IsAdminUser]
         return [permission() for permission in permission_classes]
 
+    def get_queryset(self):
+        if self.request.user.is_staff:
+            return self.queryset
+        team_member = getattr(self.request.user, "team_member", None)
+        if team_member is None:
+            return self.queryset.none()
+        return self.queryset.filter(Q(pk=team_member.pk) | Q(projects__in=project_queryset_for_user(self.request.user))).distinct()
+
 
 class ProjectViewSet(viewsets.ModelViewSet):
     queryset = Project.objects.select_related("owner").all().order_by("name")
     serializer_class = ProjectSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [ProjectPermission]
+
+    def get_queryset(self):
+        return project_queryset_for_user(self.request.user)
+
+    def get_permissions(self):
+        if self.action in {"create", "destroy"}:
+            return [IsAdminUser()]
+        return [ProjectPermission()]
 
 
 class IssueViewSet(viewsets.ModelViewSet):
     serializer_class = IssueSerializer
     filterset_fields = ["project", "status", "priority", "assignee"]
     search_fields = ["title", "description", "slug"]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IssuePermission]
 
     def get_queryset(self):
         return issue_queryset_for_user(self.request.user)
@@ -155,7 +214,7 @@ class IssueViewSet(viewsets.ModelViewSet):
                 )
 
 
-class ActivityLogViewSet(viewsets.ModelViewSet):
+class ActivityLogViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ActivityLogSerializer
     filterset_fields = ["issue", "actor"]
     permission_classes = [IsAuthenticated]

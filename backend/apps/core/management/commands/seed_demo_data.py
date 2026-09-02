@@ -49,6 +49,8 @@ class Command(BaseCommand):
                 "owner": lead,
             },
         )
+        platform.members.set([lead, backend])
+        analytics.members.set([lead, designer])
 
         seed_issues = [
             (platform, "BUG-214", "Fix flaky auth refresh flow", Issue.Status.IN_REVIEW, Issue.Priority.HIGH, backend),

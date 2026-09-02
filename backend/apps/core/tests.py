@@ -205,3 +205,75 @@ class IssueApiTests(APITestCase):
         self.assertEqual(scoped_response.status_code, status.HTTP_200_OK)
         self.assertEqual(scoped_response.data["count"], 2)
         self.assertEqual(scoped_response.data["results"][0]["assignee_name"], "Ava Chen")
+
+    def test_regular_user_sees_only_accessible_projects(self):
+        other_member = TeamMember.objects.create(
+            name="Noah Patel",
+            role="Designer",
+            email="noah@devflow.local",
+        )
+        Project.objects.create(name="Private", key="private", owner=other_member)
+
+        response = self.client.get(reverse("project-list"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["results"][0]["key"], self.project.key)
+
+    def test_project_member_can_see_project_issues(self):
+        member_user = get_user_model().objects.create_user(username="noah", password="secret123")
+        member = TeamMember.objects.create(
+            user=member_user,
+            name="Noah Patel",
+            role="Designer",
+            email="noah@devflow.local",
+        )
+        self.project.members.add(member)
+        self.client.force_authenticate(user=member_user)
+
+        response = self.client.get(reverse("issue-list"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 2)
+
+    def test_regular_user_cannot_create_or_edit_projects(self):
+        contributor_user = get_user_model().objects.create_user(username="noah", password="secret123")
+        create_response = self.client.post(
+            reverse("project-list"),
+            {"name": "New project", "key": "new-project", "owner": self.member.pk},
+            format="json",
+        )
+        self.client.force_authenticate(user=contributor_user)
+        edit_response = self.client.patch(
+            reverse("project-detail", kwargs={"pk": self.project.pk}),
+            {"name": "Renamed project"},
+            format="json",
+        )
+
+        self.assertEqual(create_response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(edit_response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_issue_cannot_be_assigned_to_non_project_member(self):
+        other_member = TeamMember.objects.create(
+            name="Noah Patel",
+            role="Designer",
+            email="noah@devflow.local",
+        )
+
+        response = self.client.patch(
+            reverse("issue-detail", kwargs={"pk": self.issue.pk}),
+            {"assignee": other_member.pk},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("assignee", response.data)
+
+    def test_activity_log_is_read_only(self):
+        response = self.client.post(
+            reverse("activity-list"),
+            {"issue": self.issue.pk, "action": "Forged change"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)

@@ -14,6 +14,7 @@ class ProjectAdmin(admin.ModelAdmin):
 	list_display = ("name", "key", "owner", "created_at")
 	search_fields = ("name", "key", "description")
 	list_filter = ("owner",)
+	filter_horizontal = ("members",)
 
 
 @admin.register(Issue)

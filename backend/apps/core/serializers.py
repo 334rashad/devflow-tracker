@@ -45,15 +45,54 @@ class TeamMemberSerializer(serializers.ModelSerializer):
 class ProjectSerializer(serializers.ModelSerializer):
     owner_name = serializers.CharField(source="owner.name", read_only=True)
 
+    def validate(self, attrs):
+        request = self.context.get("request")
+        if request and not request.user.is_staff and ("owner" in attrs or "members" in attrs):
+            raise serializers.ValidationError("Only staff users can change project ownership or membership.")
+        return attrs
+
     class Meta:
         model = Project
-        fields = ["id", "name", "key", "description", "owner", "owner_name", "created_at", "updated_at"]
+        fields = [
+            "id",
+            "name",
+            "key",
+            "description",
+            "owner",
+            "owner_name",
+            "members",
+            "created_at",
+            "updated_at",
+        ]
 
 
 class IssueSerializer(serializers.ModelSerializer):
     project_name = serializers.CharField(source="project.name", read_only=True)
     assignee_name = serializers.CharField(source="assignee.name", read_only=True)
     slug = serializers.SlugField(read_only=True)
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        if not request:
+            return attrs
+
+        project = attrs.get("project", getattr(self.instance, "project", None))
+        if project is None or request.user.is_staff:
+            return attrs
+
+        member = getattr(request.user, "team_member", None)
+        has_project_access = member and (
+            project.owner_id == member.id
+            or project.members.filter(pk=member.pk).exists()
+            or project.issues.filter(assignee=member).exists()
+        )
+        if not has_project_access:
+            raise serializers.ValidationError({"project": "You do not have access to this project."})
+
+        assignee = attrs.get("assignee", getattr(self.instance, "assignee", None))
+        if assignee and assignee != project.owner and not project.members.filter(pk=assignee.pk).exists():
+            raise serializers.ValidationError({"assignee": "The assignee must be a member of this project."})
+        return attrs
 
     def create(self, validated_data):
         base_slug = slugify(validated_data["title"])[:130] or "issue"
