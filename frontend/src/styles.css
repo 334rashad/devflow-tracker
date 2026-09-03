@@ -343,13 +343,23 @@ h1 {
 .project-card {
   display: grid;
   gap: 12px;
-  min-height: 184px;
   padding: 16px;
   border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 8px;
   background: rgba(15, 23, 42, 0.58);
+}
+
+.project-select {
+  display: grid;
+  gap: 12px;
+  min-height: 152px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: #e2e8f0;
   text-align: left;
+  font: inherit;
   cursor: pointer;
 }
 
@@ -379,7 +389,7 @@ h1 {
   letter-spacing: 0.08em;
 }
 
-.project-card > p {
+.project-select > p {
   min-height: 42px;
   margin: 0;
   color: #cfe0fb;
@@ -407,6 +417,50 @@ h1 {
   color: #fca5a5;
   font-size: 0.78rem;
   font-style: normal;
+}
+
+.project-edit {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #7dd3fc;
+  font-size: 0.84rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.project-form-actions {
+  justify-content: space-between;
+}
+
+.member-selector {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 8px;
+}
+
+.member-selector legend {
+  color: #cfe0fb;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.member-selector > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+.member-selector label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #cfe0fb;
+  font-size: 0.86rem;
 }
 
 .analytics-panel {

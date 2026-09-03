@@ -146,6 +146,16 @@ export default function App() {
     login_username: "",
     password: "",
   });
+  const [isManagingProject, setIsManagingProject] = useState(false);
+  const [projectError, setProjectError] = useState("");
+  const [projectDraft, setProjectDraft] = useState({
+    id: null as number | null,
+    name: "",
+    key: "",
+    description: "",
+    owner: "",
+    members: [] as number[],
+  });
 
   const fetchJson = async (input: string, init: RequestInit = {}) => {
     const response = await fetch(`${apiBase}${input}`, {
@@ -453,6 +463,72 @@ export default function App() {
       setIsManagingTeam(false);
     } catch (error) {
       setMemberError(error instanceof Error ? error.message : "Failed to create the member account.");
+    }
+  };
+
+  const beginCreatingProject = () => {
+    setProjectError("");
+    setProjectDraft({
+      id: null,
+      name: "",
+      key: "",
+      description: "",
+      owner: teamMembers[0] ? String(teamMembers[0].id) : "",
+      members: [],
+    });
+    setIsManagingProject(true);
+  };
+
+  const beginEditingProject = (project: Project) => {
+    setProjectError("");
+    setProjectDraft({
+      id: project.id,
+      name: project.name,
+      key: project.key,
+      description: project.description,
+      owner: String(project.owner),
+      members: project.members,
+    });
+    setIsManagingProject(true);
+  };
+
+  const toggleProjectMember = (memberId: number) => {
+    setProjectDraft((current) => ({
+      ...current,
+      members: current.members.includes(memberId)
+        ? current.members.filter((id) => id !== memberId)
+        : [...current.members, memberId],
+    }));
+  };
+
+  const saveProject = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setProjectError("");
+    if (!projectDraft.name.trim() || !projectDraft.key.trim() || !projectDraft.owner) {
+      setProjectError("A name, key, and owner are required.");
+      return;
+    }
+
+    try {
+      const response = await fetchJson(projectDraft.id ? `/projects/${projectDraft.id}/` : "/projects/", {
+        method: projectDraft.id ? "PATCH" : "POST",
+        headers: { "X-CSRFToken": getCsrfToken() },
+        body: JSON.stringify({
+          name: projectDraft.name.trim(),
+          key: projectDraft.key.trim().toLowerCase(),
+          description: projectDraft.description.trim(),
+          owner: Number(projectDraft.owner),
+          members: projectDraft.members,
+        }),
+      });
+      const saved = await response.json();
+      if (!response.ok) throw new Error(formatApiError(saved, "Failed to save the project."));
+
+      setIsManagingProject(false);
+      selectProject(String(saved.id));
+      await loadData();
+    } catch (error) {
+      setProjectError(error instanceof Error ? error.message : "Failed to save the project.");
     }
   };
 
@@ -770,7 +846,30 @@ export default function App() {
             {selectedProject ? (
               <button type="button" className="text-button" onClick={() => selectProject("all")}>Show all</button>
             ) : null}
+            {currentUser?.is_staff ? (
+              <button type="button" className="command-button" onClick={beginCreatingProject}>New project</button>
+            ) : null}
           </div>
+          {isManagingProject ? (
+            <form className="issue-form project-form" onSubmit={saveProject}>
+              <div className="form-actions project-form-actions">
+                <strong>{projectDraft.id ? "Edit project" : "New project"}</strong>
+                <button type="button" className="text-button" onClick={() => setIsManagingProject(false)}>Cancel</button>
+              </div>
+              <div className="issue-form-grid">
+                <label>Name<input value={projectDraft.name} onChange={(event) => setProjectDraft((current) => ({ ...current, name: event.target.value }))} /></label>
+                <label>Key<input value={projectDraft.key} onChange={(event) => setProjectDraft((current) => ({ ...current, key: event.target.value }))} placeholder="platform" /></label>
+                <label>Owner<select value={projectDraft.owner} onChange={(event) => setProjectDraft((current) => ({ ...current, owner: event.target.value }))}><option value="">Select owner</option>{teamMembers.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select></label>
+              </div>
+              <label>Description<textarea value={projectDraft.description} onChange={(event) => setProjectDraft((current) => ({ ...current, description: event.target.value }))} /></label>
+              <fieldset className="member-selector">
+                <legend>Project members</legend>
+                <div>{teamMembers.map((member) => <label key={member.id}><input type="checkbox" checked={projectDraft.members.includes(member.id)} onChange={() => toggleProjectMember(member.id)} />{member.name}</label>)}</div>
+              </fieldset>
+              {projectError ? <p className="auth-error">{projectError}</p> : null}
+              <button className="command-button" type="submit">{projectDraft.id ? "Save project" : "Create project"}</button>
+            </form>
+          ) : null}
           <div className="project-list">
             {projects.length === 0 ? (
               <p className="empty-state">No accessible projects yet.</p>
@@ -779,27 +878,30 @@ export default function App() {
                 const health = analytics?.project_health.find((entry) => entry.project === project.name);
                 const isSelected = project.id === Number(projectId);
                 return (
-                  <button
+                  <div
                     key={project.id}
-                    type="button"
                     className={`project-card ${isSelected ? "active" : ""}`}
-                    onClick={() => selectProject(String(project.id))}
                   >
-                    <div className="project-card-header">
-                      <strong>{project.name}</strong>
-                      <span>{project.key}</span>
-                    </div>
-                    <p>{project.description || "No project description provided."}</p>
-                    <div className="project-card-meta">
-                      <span>Owner: {project.owner_name}</span>
-                      <span>{project.members.length} members</span>
-                    </div>
-                    <div className="project-card-health">
-                      <span>{health?.total_issues ?? 0} issues</span>
-                      <strong>{health?.completion_rate ?? 0}% complete</strong>
-                      {health?.blocked_issues ? <em>{health.blocked_issues} blocked</em> : null}
-                    </div>
-                  </button>
+                    <button type="button" className="project-select" onClick={() => selectProject(String(project.id))}>
+                      <div className="project-card-header">
+                        <strong>{project.name}</strong>
+                        <span>{project.key}</span>
+                      </div>
+                      <p>{project.description || "No project description provided."}</p>
+                      <div className="project-card-meta">
+                        <span>Owner: {project.owner_name}</span>
+                        <span>{project.members.length} members</span>
+                      </div>
+                      <div className="project-card-health">
+                        <span>{health?.total_issues ?? 0} issues</span>
+                        <strong>{health?.completion_rate ?? 0}% complete</strong>
+                        {health?.blocked_issues ? <em>{health.blocked_issues} blocked</em> : null}
+                      </div>
+                    </button>
+                    {currentUser?.is_staff ? (
+                      <button type="button" className="project-edit" onClick={() => beginEditingProject(project)}>Edit project</button>
+                    ) : null}
+                  </div>
                 );
               })
             )}
