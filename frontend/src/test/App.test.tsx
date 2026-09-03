@@ -83,7 +83,7 @@ describe("App", () => {
         "GET /issues/": () => jsonResponse(issuePayload),
         "GET /dashboard/": () => jsonResponse({ open_issues: 1, blocked_issues: 0, in_progress_issues: 0, projects: 1 }),
         "GET /activity/": () => jsonResponse({ results: [] }),
-        "GET /projects/": () => jsonResponse({ results: [{ id: 1, name: "Platform Reliability" }] }),
+        "GET /projects/": () => jsonResponse({ results: [{ id: 1, name: "Platform Reliability", key: "platform", description: "Keep services reliable.", owner: 1, owner_name: "Ava Chen", members: [1] }] }),
         "GET /team-members/": () => jsonResponse({ results: [] }),
         "GET /analytics/": () => jsonResponse(emptyAnalytics),
       }),
@@ -97,6 +97,7 @@ describe("App", () => {
 
     await screen.findByRole("heading", { name: /issue queue/i });
     expect(await screen.findAllByText("Fix flaky auth refresh flow")).not.toHaveLength(0);
+    expect(screen.getByRole("button", { name: /platform.*keep services reliable/i })).toBeInTheDocument();
   });
 
   it("requires a title and project before creating an issue", async () => {

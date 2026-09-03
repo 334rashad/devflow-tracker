@@ -17,6 +17,11 @@ type Issue = {
 type Project = {
   id: number;
   name: string;
+  key: string;
+  description: string;
+  owner: number;
+  owner_name: string;
+  members: number[];
 };
 
 type TeamMember = {
@@ -101,6 +106,7 @@ export default function App() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [priority, setPriority] = useState("all");
+  const [projectId, setProjectId] = useState("all");
   const [loading, setLoading] = useState(true);
   const [issuesPage, setIssuesPage] = useState(1);
   const [issuesCount, setIssuesCount] = useState(0);
@@ -173,6 +179,7 @@ export default function App() {
     if (search) query.set("search", search);
     if (status !== "all") query.set("status", status);
     if (priority !== "all") query.set("priority", priority);
+    if (projectId !== "all") query.set("project", projectId);
 
     const issueQuery = query.toString() ? `?${query.toString()}` : "";
 
@@ -227,6 +234,7 @@ export default function App() {
     if (search) query.set("search", search);
     if (status !== "all") query.set("status", status);
     if (priority !== "all") query.set("priority", priority);
+    if (projectId !== "all") query.set("project", projectId);
     query.set("page", String(nextPage));
 
     setLoadingMoreIssues(true);
@@ -304,7 +312,7 @@ export default function App() {
   useEffect(() => {
     if (!isAuthenticated) return;
     loadData();
-  }, [search, status, priority, isAuthenticated]);
+  }, [search, status, priority, projectId, isAuthenticated]);
 
   useEffect(() => {
     if (!selectedIssueId || !isAuthenticated) {
@@ -482,6 +490,13 @@ export default function App() {
   }));
   const maxStatusCount = Math.max(...(analytics?.status_distribution.map((entry) => entry.count) ?? [1]), 1);
   const maxPriorityCount = Math.max(...(analytics?.priority_distribution.map((entry) => entry.count) ?? [1]), 1);
+  const selectedProject = projectId === "all" ? null : projects.find((project) => project.id === Number(projectId));
+
+  const selectProject = (nextProjectId: string) => {
+    setProjectId(nextProjectId);
+    setSelectedIssueId(null);
+    setDraftIssue((current) => ({ ...current, project: nextProjectId === "all" ? current.project : nextProjectId }));
+  };
 
   if (isAuthenticated === null) {
     return (
@@ -585,6 +600,10 @@ export default function App() {
               <option value="medium">Medium</option>
               <option value="high">High</option>
               <option value="critical">Critical</option>
+            </select>
+            <select value={projectId} onChange={(event) => selectProject(event.target.value)} aria-label="Filter by project">
+              <option value="all">All projects</option>
+              {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
             </select>
           </div>
 
@@ -741,6 +760,50 @@ export default function App() {
           ) : (
             <p className="empty-state">Select an issue to review details and update its workflow.</p>
           )}
+        </article>
+        <article className="surface project-panel">
+          <div className="section-header">
+            <div>
+              <h2>Projects</h2>
+              <span>{selectedProject ? `${selectedProject.name} selected` : "Accessible workspaces"}</span>
+            </div>
+            {selectedProject ? (
+              <button type="button" className="text-button" onClick={() => selectProject("all")}>Show all</button>
+            ) : null}
+          </div>
+          <div className="project-list">
+            {projects.length === 0 ? (
+              <p className="empty-state">No accessible projects yet.</p>
+            ) : (
+              projects.map((project) => {
+                const health = analytics?.project_health.find((entry) => entry.project === project.name);
+                const isSelected = project.id === Number(projectId);
+                return (
+                  <button
+                    key={project.id}
+                    type="button"
+                    className={`project-card ${isSelected ? "active" : ""}`}
+                    onClick={() => selectProject(String(project.id))}
+                  >
+                    <div className="project-card-header">
+                      <strong>{project.name}</strong>
+                      <span>{project.key}</span>
+                    </div>
+                    <p>{project.description || "No project description provided."}</p>
+                    <div className="project-card-meta">
+                      <span>Owner: {project.owner_name}</span>
+                      <span>{project.members.length} members</span>
+                    </div>
+                    <div className="project-card-health">
+                      <span>{health?.total_issues ?? 0} issues</span>
+                      <strong>{health?.completion_rate ?? 0}% complete</strong>
+                      {health?.blocked_issues ? <em>{health.blocked_issues} blocked</em> : null}
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
         </article>
 
         <article className="surface">
