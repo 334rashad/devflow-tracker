@@ -52,7 +52,16 @@ type DeliveryAnalytics = {
   risks: { blocked_issues: number; overdue_issues: number; completion_rate: number };
 };
 
-const apiBase = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
+const configuredApiBase = import.meta.env.VITE_API_BASE_URL;
+const apiBase = (() => {
+  if (!configuredApiBase) return `http://${window.location.hostname}:8000/api`;
+
+  const configuredUrl = new URL(configuredApiBase);
+  if (configuredUrl.hostname === "localhost" || configuredUrl.hostname === "127.0.0.1") {
+    configuredUrl.hostname = window.location.hostname;
+  }
+  return configuredUrl.toString().replace(/\/$/, "");
+})();
 
 const getCsrfToken = () => {
   const cookie = document.cookie
@@ -113,8 +122,8 @@ export default function App() {
   const [hasMoreIssues, setHasMoreIssues] = useState(false);
   const [loadingMoreIssues, setLoadingMoreIssues] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const [username, setUsername] = useState("admin");
-  const [password, setPassword] = useState("admin123");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
@@ -609,8 +618,6 @@ export default function App() {
               {authLoading ? "Signing in..." : "Log in"}
             </button>
           </form>
-
-          <p className="auth-hint">Demo account: admin / admin123</p>
         </div>
       </main>
     );
@@ -649,7 +656,7 @@ export default function App() {
           <div className="section-header">
             <h2>Issue queue</h2>
             <div className="section-actions">
-              <span>{issueList.length} items</span>
+              <span>{issuesCount} total</span>
               <button type="button" className="command-button" onClick={() => setIsCreatingIssue((current) => !current)}>
                 {isCreatingIssue ? "Close" : "New issue"}
               </button>
