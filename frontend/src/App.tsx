@@ -36,6 +36,7 @@ type CurrentUser = {
   username: string;
   name: string | null;
   is_staff: boolean;
+  team_member_id: number | null;
 };
 
 type AnalyticsEntry = {
@@ -396,6 +397,22 @@ export default function App() {
     setIsEditingIssue(true);
   };
 
+  const deleteIssue = async (issue: Issue) => {
+    if (!window.confirm(`Delete issue ${issue.slug}? This cannot be undone.`)) return;
+
+    try {
+      await fetchJson(`/issues/${issue.id}/`, {
+        method: "DELETE",
+        headers: { "X-CSRFToken": getCsrfToken() },
+      });
+      setIssues((current) => current.filter((existing) => existing.id !== issue.id));
+      setSelectedIssueId((current) => (current === issue.id ? null : current));
+      await loadData();
+    } catch (error) {
+      console.error("Failed to delete issue", error);
+    }
+  };
+
   const saveIssueEdits = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!selectedIssue || !editIssue.title.trim() || !editIssue.project) {
@@ -578,6 +595,16 @@ export default function App() {
   const maxStatusCount = Math.max(...(analytics?.status_distribution.map((entry) => entry.count) ?? [1]), 1);
   const maxPriorityCount = Math.max(...(analytics?.priority_distribution.map((entry) => entry.count) ?? [1]), 1);
   const selectedProject = projectId === "all" ? null : projects.find((project) => project.id === Number(projectId));
+
+  const isProjectOwner = (project: Project) =>
+    currentUser?.team_member_id != null && project.owner === currentUser.team_member_id;
+  const canManageProject = (project: Project) => Boolean(currentUser?.is_staff) || isProjectOwner(project);
+  const canDeleteIssue = (issue: Issue) => {
+    if (!currentUser) return false;
+    if (currentUser.is_staff) return true;
+    const issueProject = projects.find((project) => project.id === issue.project);
+    return issueProject ? isProjectOwner(issueProject) : false;
+  };
 
   const selectProject = (nextProjectId: string) => {
     setProjectId(nextProjectId);
@@ -788,6 +815,9 @@ export default function App() {
                 <div className="detail-header-actions">
                   <span className={`detail-badge priority-${selectedIssue.priority}`}>{selectedIssue.priority}</span>
                   <button type="button" className="text-button" onClick={beginEditingIssue}>Edit</button>
+                  {canDeleteIssue(selectedIssue) ? (
+                    <button type="button" className="text-button danger-button" onClick={() => deleteIssue(selectedIssue)}>Delete</button>
+                  ) : null}
                 </div>
               </div>
 
@@ -907,7 +937,7 @@ export default function App() {
                         {health?.blocked_issues ? <em>{health.blocked_issues} blocked</em> : null}
                       </div>
                     </button>
-                    {currentUser?.is_staff ? (
+                    {canManageProject(project) ? (
                       <button type="button" className="project-edit" onClick={() => beginEditingProject(project)}>Edit project</button>
                     ) : null}
                   </div>
@@ -924,7 +954,7 @@ export default function App() {
                 <h2>{selectedProject.name}</h2>
                 <span>{selectedProject.key} project detail</span>
               </div>
-              {currentUser?.is_staff ? (
+              {selectedProject && canManageProject(selectedProject) ? (
                 <button type="button" className="command-button" onClick={() => beginEditingProject(selectedProject)}>Edit members</button>
               ) : null}
             </div>

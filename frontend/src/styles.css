@@ -55,6 +55,14 @@ body {
   color: #e0f2fe;
 }
 
+.danger-button {
+  color: #fca5a5;
+}
+
+.danger-button:hover {
+  color: #fecaca;
+}
+
 .hero {
   display: grid;
   grid-template-columns: 1.2fr 1fr;
@@ -211,13 +219,14 @@ h1 {
 
 .content-grid {
   display: grid;
-  grid-template-columns: 1.2fr 0.8fr;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
   gap: 24px;
   margin-top: 24px;
 }
 
 .surface {
   padding: 22px;
+  min-width: 0;
 }
 
 .section-header {
@@ -286,6 +295,8 @@ h1 {
 .issue-form select,
 .issue-form textarea {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 8px;
   background: rgba(8, 16, 30, 0.8);
@@ -297,6 +308,7 @@ h1 {
 .issue-form label {
   display: grid;
   gap: 8px;
+  min-width: 0;
 }
 
 .issue-form textarea {
@@ -306,8 +318,35 @@ h1 {
 
 .issue-form-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 12px;
+}
+
+.issue-form-grid > * {
+  min-width: 0;
+}
+
+.issue-form-grid input[type="date"],
+.issue-form input[type="date"] {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: 10px 8px;
+  font-size: 0.88rem;
+}
+
+.issue-form input[type="date"]::-webkit-datetime-edit {
+  min-width: 0;
+}
+
+.issue-form input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  padding: 0;
+  margin-left: 2px;
+}
+
+.detail-edit-form .issue-form-grid {
+  grid-template-columns: 1fr;
 }
 
 .issue-form .command-button {

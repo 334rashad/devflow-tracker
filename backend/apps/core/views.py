@@ -19,6 +19,7 @@ def auth_payload(user):
             "id": user.id,
             "username": user.username,
             "name": team_member.name if team_member else None,
+            "team_member_id": team_member.id if team_member else None,
             "is_staff": user.is_staff,
         }
         if user.is_authenticated
@@ -273,16 +274,20 @@ class DeliveryAnalyticsView(APIView):
             issues = issues.filter(project=project)
         total_issues = issues.count()
 
-        status_counts = dict(issues.values_list("status").annotate(total=Count("id")))
-        priority_counts = dict(issues.values_list("priority").annotate(total=Count("id")))
-        project_rows = issues.values("project__name").annotate(
-            total=Count("id"),
-            completed=Count("id", filter=Q(status=Issue.Status.DONE)),
-            blocked=Count("id", filter=Q(status=Issue.Status.BLOCKED)),
+        # Clear the base "-created_at" ordering before grouping: leaving it in place makes Django add
+        # created_at to GROUP BY (one group per issue) and the project__members M2M join then inflates
+        # each group's count, so every aggregate below must reset ordering and use distinct=True.
+        ungrouped = issues.order_by()
+        status_counts = dict(ungrouped.values_list("status").annotate(total=Count("id", distinct=True)))
+        priority_counts = dict(ungrouped.values_list("priority").annotate(total=Count("id", distinct=True)))
+        project_rows = ungrouped.values("project__name").annotate(
+            total=Count("id", distinct=True),
+            completed=Count("id", filter=Q(status=Issue.Status.DONE), distinct=True),
+            blocked=Count("id", filter=Q(status=Issue.Status.BLOCKED), distinct=True),
         ).order_by("project__name")
-        workload = issues.exclude(assignee__isnull=True).exclude(status=Issue.Status.DONE).values(
+        workload = ungrouped.exclude(assignee__isnull=True).exclude(status=Issue.Status.DONE).values(
             "assignee__name"
-        ).annotate(active_issues=Count("id")).order_by("-active_issues", "assignee__name")
+        ).annotate(active_issues=Count("id", distinct=True)).order_by("-active_issues", "assignee__name")
 
         return Response(
             {
