@@ -204,13 +204,15 @@ export default function App() {
 
     setLoading(true);
     try {
+      const projectQuery = projectId === "all" ? "" : `?project=${projectId}`;
+      const activityQuery = projectId === "all" ? "?page_size=5" : `?project=${projectId}&page_size=5`;
       const [issuesRes, statsRes, activityRes, projectsRes, teamMembersRes, analyticsRes] = await Promise.all([
         fetchJson(`/issues/${issueQuery}`),
         fetchJson(`/dashboard/`),
-        fetchJson(`/activity/?page_size=5`),
+        fetchJson(`/activity/${activityQuery}`),
         fetchJson(`/projects/`),
         fetchJson(`/team-members/`),
-        fetchJson(`/analytics/`),
+        fetchJson(`/analytics/${projectQuery}`),
       ]);
 
       const issuesPayload = await issuesRes.json();
@@ -571,7 +573,7 @@ export default function App() {
   ];
   const memberWorkload = teamMembers.map((member) => ({
     ...member,
-    activeIssues: issues.filter((issue) => issue.assignee === member.id && issue.status !== "done").length,
+    activeIssues: analytics?.workload.find((entry) => entry.member === member.name)?.active_issues ?? 0,
   }));
   const maxStatusCount = Math.max(...(analytics?.status_distribution.map((entry) => entry.count) ?? [1]), 1);
   const maxPriorityCount = Math.max(...(analytics?.priority_distribution.map((entry) => entry.count) ?? [1]), 1);
@@ -654,7 +656,7 @@ export default function App() {
       <section className="content-grid">
         <article className="surface">
           <div className="section-header">
-            <h2>Issue queue</h2>
+            <h2>{selectedProject ? `${selectedProject.name} issues` : "Issue queue"}</h2>
             <div className="section-actions">
               <span>{issuesCount} total</span>
               <button type="button" className="command-button" onClick={() => setIsCreatingIssue((current) => !current)}>
@@ -914,6 +916,48 @@ export default function App() {
             )}
           </div>
         </article>
+
+        {selectedProject ? (
+          <article className="surface project-detail-panel">
+            <div className="section-header">
+              <div>
+                <h2>{selectedProject.name}</h2>
+                <span>{selectedProject.key} project detail</span>
+              </div>
+              {currentUser?.is_staff ? (
+                <button type="button" className="command-button" onClick={() => beginEditingProject(selectedProject)}>Edit members</button>
+              ) : null}
+            </div>
+            <p className="project-detail-description">{selectedProject.description || "No project description provided."}</p>
+            <div className="project-detail-meta">
+              <span>Owner: {selectedProject.owner_name}</span>
+              <span>{issuesCount} total issues</span>
+              <span>{analytics?.risks.completion_rate ?? 0}% complete</span>
+            </div>
+            <div className="project-detail-grid">
+              <div>
+                <h3>Member workload</h3>
+                <div className="workload-list">
+                  {memberWorkload.filter((member) => member.id === selectedProject.owner || selectedProject.members.includes(member.id)).map((member) => (
+                    <div className="workload-row" key={member.id}>
+                      <div><strong>{member.name}</strong><small>{member.role}</small></div>
+                      <span>{member.activeIssues} active</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <h3>Project activity</h3>
+                <ul className="activity-list">
+                  {activityList.length === 0 ? <li>No project activity yet.</li> : activityList.map((item) => {
+                    const entry = item as { id: number; actor_name?: string; issue_slug?: string; issue_title?: string; action?: string; details?: { from?: string; to?: string } };
+                    return <li key={entry.id}>{formatActivityMessage(entry)}</li>;
+                  })}
+                </ul>
+              </div>
+            </div>
+          </article>
+        ) : null}
 
         <article className="surface">
           <div className="section-header">
