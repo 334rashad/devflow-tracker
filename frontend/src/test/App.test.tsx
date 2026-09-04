@@ -157,4 +157,34 @@ describe("App", () => {
     expect(screen.getByText("Project members")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /create project/i })).toBeInTheDocument();
   });
+
+  it("shows scoped project detail after selecting a project", async () => {
+    vi.stubGlobal(
+      "fetch",
+      mockFetchRoutes({
+        "GET /auth/login/": () => jsonResponse({ authenticated: false }),
+        "POST /auth/login/": () =>
+          jsonResponse({ authenticated: true, user: { id: 1, username: "ava", name: "Ava Chen", is_staff: false } }),
+        "GET /issues/": () => jsonResponse(issuePayload),
+        "GET /issues/1/": () => jsonResponse(issuePayload.results[0]),
+        "GET /dashboard/": () => jsonResponse({ open_issues: 1, blocked_issues: 0, in_progress_issues: 0, projects: 1 }),
+        "GET /activity/": () => jsonResponse({ results: [] }),
+        "GET /projects/": () => jsonResponse({ results: [{ id: 1, name: "Platform Reliability", key: "platform", description: "Keep services reliable.", owner: 1, owner_name: "Ava Chen", members: [1] }] }),
+        "GET /team-members/": () => jsonResponse({ results: [{ id: 1, name: "Ava Chen", role: "Lead", email: "ava@example.com" }] }),
+        "GET /analytics/": () => jsonResponse(emptyAnalytics),
+      }),
+    );
+
+    render(<App />);
+
+    await userEvent.type(await screen.findByLabelText(/username/i), "ava");
+    await userEvent.type(screen.getByLabelText(/password/i), "secret123");
+    await userEvent.click(screen.getByRole("button", { name: /log in/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /platform reliability.*keep services reliable/i }));
+
+    expect(await screen.findByRole("heading", { name: "Platform Reliability" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Platform Reliability issues" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Project activity" })).toBeInTheDocument();
+    expect(screen.getByText("1 total issues")).toBeInTheDocument();
+  });
 });

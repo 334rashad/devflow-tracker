@@ -334,6 +334,36 @@ h1 {
   grid-column: 1 / -1;
 }
 
+.project-detail-panel {
+  grid-column: 1 / -1;
+}
+
+.project-detail-description {
+  margin: 0;
+  color: #dfeaf9;
+  line-height: 1.6;
+}
+
+.project-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  margin: 16px 0 22px;
+  color: #9bb0d0;
+  font-size: 0.88rem;
+}
+
+.project-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px;
+}
+
+.project-detail-grid h3 {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+}
+
 .project-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -784,7 +814,8 @@ h1 {
   }
 
   .risk-summary,
-  .analytics-grid {
+  .analytics-grid,
+  .project-detail-grid {
     grid-template-columns: 1fr;
   }
 
