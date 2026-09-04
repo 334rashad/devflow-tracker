@@ -1,5 +1,6 @@
 from django.contrib.auth import authenticate, login, logout
 from django.db.models import Count, Q
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.permissions import AllowAny, BasePermission, IsAdminUser, IsAuthenticated, SAFE_METHODS
@@ -224,13 +225,16 @@ class ActivityLogViewSet(viewsets.ReadOnlyModelViewSet):
         user = self.request.user
 
         if user.is_staff:
-            return queryset
+            accessible_activity = queryset
+        else:
+            team_member = getattr(user, "team_member", None)
+            if team_member is None:
+                return queryset.none()
 
-        team_member = getattr(user, "team_member", None)
-        if team_member is None:
-            return queryset.none()
+            accessible_activity = queryset.filter(Q(issue__assignee=team_member) | Q(issue__project__owner=team_member))
 
-        return queryset.filter(Q(issue__assignee=team_member) | Q(issue__project__owner=team_member))
+        project_id = self.request.query_params.get("project")
+        return accessible_activity.filter(issue__project_id=project_id) if project_id else accessible_activity
 
 
 class DashboardStatsView(APIView):
@@ -263,6 +267,10 @@ class DeliveryAnalyticsView(APIView):
     def get(self, request):
         today = timezone.localdate()
         issues = issue_queryset_for_user(request.user)
+        project_id = request.query_params.get("project")
+        if project_id:
+            project = get_object_or_404(project_queryset_for_user(request.user), pk=project_id)
+            issues = issues.filter(project=project)
         total_issues = issues.count()
 
         status_counts = dict(issues.values_list("status").annotate(total=Count("id")))
