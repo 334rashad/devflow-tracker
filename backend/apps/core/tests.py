@@ -277,3 +277,28 @@ class IssueApiTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def test_project_scoped_activity_and_analytics_only_include_project_work(self):
+        other_project = Project.objects.create(name="Mobile", key="mobile", owner=self.member)
+        other_issue = Issue.objects.create(
+            project=other_project,
+            title="Fix offline sync",
+            slug="fix-offline-sync",
+            status=Issue.Status.BLOCKED,
+            priority=Issue.Priority.HIGH,
+            assignee=self.member,
+        )
+        ActivityLog.objects.create(issue=self.issue, actor=self.member, action="Reviewed auth flow")
+        ActivityLog.objects.create(issue=other_issue, actor=self.member, action="Reported sync blocker")
+
+        activity_response = self.client.get(reverse("activity-list"), {"project": self.project.pk})
+        analytics_response = self.client.get(reverse("delivery-analytics"), {"project": self.project.pk})
+
+        self.assertEqual(activity_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(activity_response.data["count"], 1)
+        self.assertEqual(activity_response.data["results"][0]["issue"], self.issue.pk)
+        self.assertEqual(analytics_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(analytics_response.data["project_health"], [
+            {"project": "Platform", "total_issues": 2, "blocked_issues": 0, "completion_rate": 0}
+        ])
+        self.assertEqual(analytics_response.data["workload"], [{"member": "Ava Chen", "active_issues": 2}])
