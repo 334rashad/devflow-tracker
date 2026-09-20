@@ -14,6 +14,15 @@ type Issue = {
   due_date?: string | null;
 };
 
+type IssueComment = {
+  id: number;
+  issue: number;
+  author: number | null;
+  author_name?: string;
+  body: string;
+  created_at: string;
+};
+
 type Project = {
   id: number;
   name: string;
@@ -74,6 +83,11 @@ const getCsrfToken = () => {
 
 const formatStatus = (value: string) => value.replace(/_/g, " ");
 
+const formatTimestamp = (value: string) => {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
+};
+
 const formatApiError = (payload: unknown, fallback: string) => {
   if (typeof payload === "string") return payload;
   if (payload && typeof payload === "object") {
@@ -132,6 +146,11 @@ export default function App() {
   const [createError, setCreateError] = useState("");
   const [isEditingIssue, setIsEditingIssue] = useState(false);
   const [editError, setEditError] = useState("");
+  const [statusError, setStatusError] = useState("");
+  const [comments, setComments] = useState<IssueComment[]>([]);
+  const [commentBody, setCommentBody] = useState("");
+  const [commentLoading, setCommentLoading] = useState(false);
+  const [commentError, setCommentError] = useState("");
   const [editIssue, setEditIssue] = useState({
     title: "",
     description: "",
@@ -339,8 +358,13 @@ export default function App() {
   useEffect(() => {
     if (!selectedIssueId || !isAuthenticated) {
       setSelectedIssue(null);
+      setComments([]);
       return;
     }
+
+    setStatusError("");
+    setCommentError("");
+    setCommentBody("");
 
     async function loadIssue() {
       try {
@@ -352,7 +376,18 @@ export default function App() {
       }
     }
 
+    async function loadComments() {
+      try {
+        const response = await fetchJson(`/issue-comments/?issue=${selectedIssueId}`);
+        const payload = await response.json();
+        setComments(normalizeList<IssueComment>(payload));
+      } catch (error) {
+        console.error("Failed to load issue comments", error);
+      }
+    }
+
     loadIssue();
+    loadComments();
   }, [selectedIssueId, isAuthenticated]);
 
   const updateIssue = async (changes: Partial<Issue>) => {
@@ -369,6 +404,10 @@ export default function App() {
       });
 
       const updated = await response.json();
+      if (!response.ok) {
+        throw new Error(formatApiError(updated, "Failed to update issue."));
+      }
+
       setSelectedIssue((current) => (current ? { ...current, ...updated } : current));
       setIssues((current) => current.map((issue) => (issue.id === updated.id ? { ...issue, ...updated } : issue)));
 
@@ -380,6 +419,36 @@ export default function App() {
     } catch (error) {
       console.error("Failed to update issue", error);
       throw error;
+    }
+  };
+
+  const submitComment = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedIssue || !commentBody.trim()) return;
+
+    setCommentLoading(true);
+    setCommentError("");
+    try {
+      const response = await fetchJson(`/issue-comments/`, {
+        method: "POST",
+        headers: { "X-CSRFToken": getCsrfToken() },
+        body: JSON.stringify({ issue: selectedIssue.id, body: commentBody.trim() }),
+      });
+      const created = await response.json();
+      if (!response.ok) {
+        throw new Error(formatApiError(created, "Failed to add comment."));
+      }
+
+      setComments((current) => [...current, created]);
+      setCommentBody("");
+
+      const refreshedActivity = await fetchJson(`/activity/?page_size=5`);
+      const nextActivity = await refreshedActivity.json();
+      setActivity(normalizeList<Record<string, unknown>>(nextActivity));
+    } catch (error) {
+      setCommentError(error instanceof Error ? error.message : "Failed to add comment.");
+    } finally {
+      setCommentLoading(false);
     }
   };
 
@@ -850,7 +919,12 @@ export default function App() {
                     Status
                     <select
                       value={selectedIssue.status}
-                      onChange={(event) => updateIssue({ status: event.target.value })}
+                      onChange={(event) => {
+                        setStatusError("");
+                        updateIssue({ status: event.target.value }).catch((error) => {
+                          setStatusError(error instanceof Error ? error.message : "Failed to update status.");
+                        });
+                      }}
                     >
                       <option value="todo">Todo</option>
                       <option value="in_progress">In Progress</option>
@@ -869,6 +943,38 @@ export default function App() {
                       {teamMembers.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
                     </select>
                   </label>
+                </div>
+                {statusError ? <p className="auth-error">{statusError}</p> : null}
+
+                <div className="detail-comments">
+                  <h3>Comments</h3>
+                  <ul className="comment-list">
+                    {comments.length === 0 ? (
+                      <li className="empty-state">No comments yet. Start the discussion below.</li>
+                    ) : (
+                      comments.map((comment) => (
+                        <li key={comment.id} className="comment-row">
+                          <div className="comment-meta">
+                            <strong>{comment.author_name ?? "Unknown"}</strong>
+                            <span>{formatTimestamp(comment.created_at)}</span>
+                          </div>
+                          <p>{comment.body}</p>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                  <form className="comment-form" onSubmit={submitComment}>
+                    <textarea
+                      value={commentBody}
+                      onChange={(event) => setCommentBody(event.target.value)}
+                      placeholder="Add a comment..."
+                      aria-label="Add a comment"
+                    />
+                    {commentError ? <p className="auth-error">{commentError}</p> : null}
+                    <button className="command-button" type="submit" disabled={commentLoading || !commentBody.trim()}>
+                      {commentLoading ? "Posting…" : "Post comment"}
+                    </button>
+                  </form>
                 </div>
               </>}
             </div>

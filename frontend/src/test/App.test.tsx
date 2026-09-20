@@ -187,4 +187,106 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "Project activity" })).toBeInTheDocument();
     expect(screen.getByText("1 total issues")).toBeInTheDocument();
   });
+
+  it("shows issue comments oldest to newest with author and timestamp", async () => {
+    vi.stubGlobal(
+      "fetch",
+      mockFetchRoutes({
+        "GET /auth/login/": () => jsonResponse({ authenticated: false }),
+        "POST /auth/login/": () =>
+          jsonResponse({ authenticated: true, user: { id: 1, username: "ava", name: "Ava Chen", is_staff: false } }),
+        "GET /issues/1/": () => jsonResponse(issuePayload.results[0]),
+        "GET /issues/": () => jsonResponse(issuePayload),
+        "GET /dashboard/": () => jsonResponse({ open_issues: 1, blocked_issues: 0, in_progress_issues: 0, projects: 1 }),
+        "GET /activity/": () => jsonResponse({ results: [] }),
+        "GET /projects/": () => jsonResponse({ results: [{ id: 1, name: "Platform Reliability", key: "platform", description: "Keep services reliable.", owner: 1, owner_name: "Ava Chen", members: [1] }] }),
+        "GET /team-members/": () => jsonResponse({ results: [] }),
+        "GET /analytics/": () => jsonResponse(emptyAnalytics),
+        "GET /issue-comments/": () =>
+          jsonResponse({
+            count: 2,
+            results: [
+              { id: 1, issue: 1, author: 1, author_name: "Ava Chen", body: "First look at this", created_at: "2026-01-01T10:00:00Z" },
+              { id: 2, issue: 1, author: 1, author_name: "Ava Chen", body: "Second update", created_at: "2026-01-02T10:00:00Z" },
+            ],
+          }),
+      }),
+    );
+
+    render(<App />);
+
+    await userEvent.type(await screen.findByLabelText(/username/i), "ava");
+    await userEvent.type(screen.getByLabelText(/password/i), "secret123");
+    await userEvent.click(screen.getByRole("button", { name: /log in/i }));
+
+    const comments = await screen.findAllByText(/First look at this|Second update/);
+    expect(comments[0]).toHaveTextContent("First look at this");
+    expect(comments[1]).toHaveTextContent("Second update");
+    expect(screen.getAllByText("Ava Chen").length).toBeGreaterThan(0);
+  });
+
+  it("submits a new comment through the composer", async () => {
+    vi.stubGlobal(
+      "fetch",
+      mockFetchRoutes({
+        "GET /auth/login/": () => jsonResponse({ authenticated: false }),
+        "POST /auth/login/": () =>
+          jsonResponse({ authenticated: true, user: { id: 1, username: "ava", name: "Ava Chen", is_staff: false } }),
+        "GET /issues/1/": () => jsonResponse(issuePayload.results[0]),
+        "GET /issues/": () => jsonResponse(issuePayload),
+        "GET /dashboard/": () => jsonResponse({ open_issues: 1, blocked_issues: 0, in_progress_issues: 0, projects: 1 }),
+        "GET /activity/": () => jsonResponse({ results: [] }),
+        "GET /projects/": () => jsonResponse({ results: [{ id: 1, name: "Platform Reliability", key: "platform", description: "Keep services reliable.", owner: 1, owner_name: "Ava Chen", members: [1] }] }),
+        "GET /team-members/": () => jsonResponse({ results: [] }),
+        "GET /analytics/": () => jsonResponse(emptyAnalytics),
+        "GET /issue-comments/": () => jsonResponse({ count: 0, results: [] }),
+        "POST /issue-comments/": () =>
+          jsonResponse({ id: 5, issue: 1, author: 1, author_name: "Ava Chen", body: "Looks resolved now.", created_at: "2026-01-03T10:00:00Z" }, 201),
+      }),
+    );
+
+    render(<App />);
+
+    await userEvent.type(await screen.findByLabelText(/username/i), "ava");
+    await userEvent.type(screen.getByLabelText(/password/i), "secret123");
+    await userEvent.click(screen.getByRole("button", { name: /log in/i }));
+
+    const composer = await screen.findByPlaceholderText("Add a comment...");
+    await userEvent.type(composer, "Looks resolved now.");
+    await userEvent.click(screen.getByRole("button", { name: /post comment/i }));
+
+    expect(await screen.findByText("Looks resolved now.")).toBeInTheDocument();
+  });
+
+  it("shows an error when an invalid status transition is rejected", async () => {
+    vi.stubGlobal(
+      "fetch",
+      mockFetchRoutes({
+        "GET /auth/login/": () => jsonResponse({ authenticated: false }),
+        "POST /auth/login/": () =>
+          jsonResponse({ authenticated: true, user: { id: 1, username: "ava", name: "Ava Chen", is_staff: false } }),
+        "GET /issues/1/": () => jsonResponse(issuePayload.results[0]),
+        "GET /issues/": () => jsonResponse(issuePayload),
+        "GET /dashboard/": () => jsonResponse({ open_issues: 1, blocked_issues: 0, in_progress_issues: 0, projects: 1 }),
+        "GET /activity/": () => jsonResponse({ results: [] }),
+        "GET /projects/": () => jsonResponse({ results: [{ id: 1, name: "Platform Reliability", key: "platform", description: "Keep services reliable.", owner: 1, owner_name: "Ava Chen", members: [1] }] }),
+        "GET /team-members/": () => jsonResponse({ results: [] }),
+        "GET /analytics/": () => jsonResponse(emptyAnalytics),
+        "GET /issue-comments/": () => jsonResponse({ count: 0, results: [] }),
+        "PATCH /issues/1/": () =>
+          jsonResponse({ status: ["Cannot move an issue from todo to done."] }, 400),
+      }),
+    );
+
+    render(<App />);
+
+    await userEvent.type(await screen.findByLabelText(/username/i), "ava");
+    await userEvent.type(screen.getByLabelText(/password/i), "secret123");
+    await userEvent.click(screen.getByRole("button", { name: /log in/i }));
+
+    await screen.findByRole("heading", { name: /issue detail/i });
+    await userEvent.selectOptions(screen.getByLabelText(/^status$/i), "done");
+
+    expect(await screen.findByText("Cannot move an issue from todo to done.")).toBeInTheDocument();
+  });
 });
