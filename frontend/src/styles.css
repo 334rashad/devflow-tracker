@@ -891,6 +891,20 @@ h1 {
   padding-left: 18px;
 }
 
+.activity-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.activity-date {
+  flex-shrink: 0;
+  color: #9bb0d0;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
 @media (max-width: 900px) {
   .hero,
   .content-grid {

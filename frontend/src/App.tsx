@@ -88,6 +88,13 @@ const formatTimestamp = (value: string) => {
   return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
 };
 
+const formatActivityDate = (value?: string) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+};
+
 const formatApiError = (payload: unknown, fallback: string) => {
   if (typeof payload === "string") return payload;
   if (payload && typeof payload === "object") {
@@ -1112,9 +1119,15 @@ export default function App() {
                   issue_title?: string;
                   action?: string;
                   details?: { from?: string; to?: string };
+                  created_at?: string;
                 };
 
-                return <li key={entry.id}>{formatActivityMessage(entry)}</li>;
+                return (
+                  <li key={entry.id} className="activity-row">
+                    <span>{formatActivityMessage(entry)}</span>
+                    <span className="activity-date">{formatActivityDate(entry.created_at)}</span>
+                  </li>
+                );
               })
             )}
           </ul>
