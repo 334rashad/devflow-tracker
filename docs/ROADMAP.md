@@ -13,6 +13,8 @@
 - filtering, search, and metrics
 - activity timeline
 - polished issue details and forms
+- issue comments with scoped access and activity history
+- enforced issue status transition rules
 
 ## Week 3
 

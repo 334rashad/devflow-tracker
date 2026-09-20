@@ -8,6 +8,8 @@ DevFlow & BugSync is an internal engineering workspace for tracking issue delive
 - Team-scoped issue access for regular users and full organization access for staff.
 - Search, status and priority filters, issue creation, assignment, and complete issue editing.
 - Activity history for creation, status, assignee, title, description, priority, project, and due-date changes.
+- Threaded, immutable issue comments scoped to the same access rules as the issue itself.
+- Enforced issue status workflow (todo, in progress, in review, blocked, done) that rejects invalid transitions.
 - Delivery-health analytics for workflow distribution, priority mix, workload, project completion, blocked work, and overdue work.
 - Staff-only team management that creates a Django login account and linked product profile together.
 
