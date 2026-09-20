@@ -3,7 +3,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 
-from apps.core.models import ActivityLog, Issue, Project, TeamMember
+from apps.core.models import ActivityLog, Issue, IssueComment, Project, TeamMember
 
 
 class IssueApiTests(APITestCase):
@@ -302,3 +302,100 @@ class IssueApiTests(APITestCase):
             {"project": "Platform", "total_issues": 2, "blocked_issues": 0, "completion_rate": 0}
         ])
         self.assertEqual(analytics_response.data["workload"], [{"member": "Ava Chen", "active_issues": 2}])
+
+    def test_user_with_issue_access_can_list_and_create_comments(self):
+        response = self.client.post(
+            reverse("issue-comment-list"),
+            {"issue": self.issue.pk, "body": "Reproduced on staging, looking into it."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["author_name"], "Ava Chen")
+        self.assertIn("created_at", response.data)
+
+        list_response = self.client.get(reverse("issue-comment-list"), {"issue": self.issue.pk})
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(list_response.data["count"], 1)
+
+    def test_user_without_issue_access_cannot_create_comment(self):
+        other_member = TeamMember.objects.create(name="Noah Patel", role="Designer", email="noah@devflow.local")
+        other_project = Project.objects.create(name="Private", key="private", owner=other_member)
+        other_issue = Issue.objects.create(
+            project=other_project,
+            title="Confidential issue",
+            slug="confidential-issue",
+            status=Issue.Status.TODO,
+            priority=Issue.Priority.LOW,
+        )
+
+        response = self.client.post(
+            reverse("issue-comment-list"),
+            {"issue": other_issue.pk, "body": "Should not be allowed."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertFalse(IssueComment.objects.filter(issue=other_issue).exists())
+
+    def test_comment_list_only_returns_accessible_issue_comments(self):
+        other_member = TeamMember.objects.create(name="Noah Patel", role="Designer", email="noah@devflow.local")
+        other_project = Project.objects.create(name="Private", key="private", owner=other_member)
+        other_issue = Issue.objects.create(
+            project=other_project,
+            title="Confidential issue",
+            slug="confidential-issue",
+            status=Issue.Status.TODO,
+            priority=Issue.Priority.LOW,
+        )
+        IssueComment.objects.create(issue=other_issue, author=other_member, body="Private note")
+        IssueComment.objects.create(issue=self.issue, author=self.member, body="Visible note")
+
+        response = self.client.get(reverse("issue-comment-list"), {"issue": self.issue.pk})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["results"][0]["body"], "Visible note")
+
+    def test_comment_creation_adds_activity_entry(self):
+        self.client.post(
+            reverse("issue-comment-list"),
+            {"issue": self.issue.pk, "body": "Adding more context here."},
+            format="json",
+        )
+
+        self.assertTrue(
+            ActivityLog.objects.filter(issue=self.issue, action="Comment added").exists()
+        )
+
+    def test_empty_comment_body_is_rejected(self):
+        response = self.client.post(
+            reverse("issue-comment-list"),
+            {"issue": self.issue.pk, "body": "   "},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("body", response.data)
+
+    def test_valid_status_transition_is_accepted(self):
+        response = self.client.patch(
+            reverse("issue-detail", kwargs={"pk": self.issue.pk}),
+            {"status": Issue.Status.IN_PROGRESS},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], Issue.Status.IN_PROGRESS)
+
+    def test_invalid_status_transition_is_rejected(self):
+        response = self.client.patch(
+            reverse("issue-detail", kwargs={"pk": self.issue.pk}),
+            {"status": Issue.Status.TODO},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("status", response.data)
+        self.issue.refresh_from_db()
+        self.assertEqual(self.issue.status, Issue.Status.IN_REVIEW)

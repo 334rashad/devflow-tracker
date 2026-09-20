@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import ActivityLog, Issue, Project, TeamMember
+from .models import ActivityLog, Issue, IssueComment, Project, TeamMember
 
 
 @admin.register(TeamMember)
@@ -28,4 +28,11 @@ class IssueAdmin(admin.ModelAdmin):
 class ActivityLogAdmin(admin.ModelAdmin):
 	list_display = ("action", "issue", "actor", "created_at")
 	search_fields = ("action",)
+	list_filter = ("created_at",)
+
+
+@admin.register(IssueComment)
+class IssueCommentAdmin(admin.ModelAdmin):
+	list_display = ("issue", "author", "created_at")
+	search_fields = ("body",)
 	list_filter = ("created_at",)

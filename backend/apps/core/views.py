@@ -2,13 +2,14 @@ from django.contrib.auth import authenticate, login, logout
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from rest_framework import viewsets
+from rest_framework import mixins, viewsets
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny, BasePermission, IsAdminUser, IsAuthenticated, SAFE_METHODS
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import ActivityLog, Issue, Project, TeamMember
-from .serializers import ActivityLogSerializer, IssueSerializer, ProjectSerializer, TeamMemberSerializer
+from .models import ActivityLog, Issue, IssueComment, Project, TeamMember
+from .serializers import ActivityLogSerializer, IssueCommentSerializer, IssueSerializer, ProjectSerializer, TeamMemberSerializer
 
 
 def auth_payload(user):
@@ -214,6 +215,34 @@ class IssueViewSet(viewsets.ModelViewSet):
                     action=f"Issue {field} updated",
                     details={"from": previous_value, "to": updated_value},
                 )
+
+
+class IssueCommentViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewsets.GenericViewSet):
+    serializer_class = IssueCommentSerializer
+    filterset_fields = ["issue"]
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return IssueComment.objects.select_related("issue", "author").filter(
+            issue__in=issue_queryset_for_user(self.request.user)
+        )
+
+    def _accessible_issue(self, issue_id):
+        return get_object_or_404(issue_queryset_for_user(self.request.user), pk=issue_id)
+
+    def perform_create(self, serializer):
+        issue_id = self.request.data.get("issue")
+        if not issue_id:
+            raise ValidationError({"issue": "This field is required."})
+        issue = self._accessible_issue(issue_id)
+        author = getattr(self.request.user, "team_member", None)
+        comment = serializer.save(issue=issue, author=author)
+        ActivityLog.objects.create(
+            issue=issue,
+            actor=author,
+            action="Comment added",
+            details={"comment_id": comment.id},
+        )
 
 
 class ActivityLogViewSet(viewsets.ReadOnlyModelViewSet):

@@ -2,12 +2,23 @@ from rest_framework.routers import DefaultRouter
 
 from django.urls import path
 
-from .views import ActivityLogViewSet, DashboardStatsView, DeliveryAnalyticsView, IssueViewSet, LoginView, LogoutView, ProjectViewSet, TeamMemberViewSet
+from .views import (
+    ActivityLogViewSet,
+    DashboardStatsView,
+    DeliveryAnalyticsView,
+    IssueCommentViewSet,
+    IssueViewSet,
+    LoginView,
+    LogoutView,
+    ProjectViewSet,
+    TeamMemberViewSet,
+)
 
 router = DefaultRouter()
 router.register(r"team-members", TeamMemberViewSet, basename="team-member")
 router.register(r"projects", ProjectViewSet, basename="project")
 router.register(r"issues", IssueViewSet, basename="issue")
+router.register(r"issue-comments", IssueCommentViewSet, basename="issue-comment")
 router.register(r"activity", ActivityLogViewSet, basename="activity")
 
 urlpatterns = [

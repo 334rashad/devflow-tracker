@@ -3,7 +3,7 @@ from django.db import transaction
 from django.utils.text import slugify
 from rest_framework import serializers
 
-from .models import ActivityLog, Issue, Project, TeamMember
+from .models import ActivityLog, Issue, IssueComment, Project, TeamMember
 
 
 class TeamMemberSerializer(serializers.ModelSerializer):
@@ -92,6 +92,14 @@ class IssueSerializer(serializers.ModelSerializer):
         assignee = attrs.get("assignee", getattr(self.instance, "assignee", None))
         if assignee and assignee != project.owner and not project.members.filter(pk=assignee.pk).exists():
             raise serializers.ValidationError({"assignee": "The assignee must be a member of this project."})
+
+        new_status = attrs.get("status")
+        if self.instance is not None and new_status and new_status != self.instance.status:
+            allowed = Issue.VALID_STATUS_TRANSITIONS.get(self.instance.status, set())
+            if new_status not in allowed:
+                raise serializers.ValidationError(
+                    {"status": f"Cannot move an issue from {self.instance.status} to {new_status}."}
+                )
         return attrs
 
     def create(self, validated_data):
@@ -142,3 +150,25 @@ class ActivityLogSerializer(serializers.ModelSerializer):
             "details",
             "created_at",
         ]
+
+
+class IssueCommentSerializer(serializers.ModelSerializer):
+    author_name = serializers.CharField(source="author.name", read_only=True)
+
+    class Meta:
+        model = IssueComment
+        fields = [
+            "id",
+            "issue",
+            "author",
+            "author_name",
+            "body",
+            "created_at",
+        ]
+        read_only_fields = ["issue", "author", "created_at"]
+
+    def validate_body(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("Comment body cannot be empty.")
+        return value.strip()
+

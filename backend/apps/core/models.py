@@ -45,6 +45,15 @@ class Issue(TimestampedModel):
         HIGH = "high", "High"
         CRITICAL = "critical", "Critical"
 
+    # Allowed forward/back moves for each status; anything else is rejected by IssueSerializer.
+    VALID_STATUS_TRANSITIONS = {
+        Status.TODO: {Status.IN_PROGRESS},
+        Status.IN_PROGRESS: {Status.IN_REVIEW, Status.BLOCKED},
+        Status.IN_REVIEW: {Status.DONE, Status.IN_PROGRESS},
+        Status.BLOCKED: {Status.IN_PROGRESS},
+        Status.DONE: {Status.IN_PROGRESS},
+    }
+
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="issues")
     title = models.CharField(max_length=180)
     slug = models.SlugField(unique=True)
@@ -72,3 +81,15 @@ class ActivityLog(TimestampedModel):
 
     def __str__(self) -> str:
         return self.action
+
+
+class IssueComment(TimestampedModel):
+    issue = models.ForeignKey(Issue, on_delete=models.CASCADE, related_name="comments")
+    author = models.ForeignKey(TeamMember, on_delete=models.SET_NULL, null=True, blank=True, related_name="issue_comments")
+    body = models.TextField()
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self) -> str:
+        return f"Comment on {self.issue.slug}"
