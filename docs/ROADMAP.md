@@ -18,10 +18,15 @@
 
 ## Week 3
 
-- tests for critical flows
+- tests for critical flows: comment access scoping, comment creation, activity logging for comments, and valid/invalid status transitions (backend + frontend)
 - deployment setup
 - sample data and README screenshots
 - final code cleanup and interview prep notes
+
+## Next milestone
+
+- capture updated dashboard, issue-detail-with-comments, and workflow-transition screenshots
+- run a final naming/formatting pass across backend and frontend before the deployment pass
 
 ## Commit Strategy
 

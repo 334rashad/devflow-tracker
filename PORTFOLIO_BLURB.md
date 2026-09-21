@@ -12,9 +12,11 @@ I just shipped **DevFlow & BugSync** — a full-stack engineering issue tracker 
 
 What it does:
 - Tracks issues with full CRUD, status workflow, assignment, and priority.
+- Enforces a real workflow: status transitions are validated server-side, so an issue can't jump from "Todo" straight to "Done" — the API rejects it with a clear reason the UI surfaces inline.
+- Supports threaded, immutable issue comments scoped by the same access rules as the issue itself, so discussion becomes part of the audit trail alongside status and assignment changes.
 - Scopes visibility by team membership, not just by login — a `TeamMember` profile (not the raw `User`) drives what each person can see.
-- Logs every meaningful change — status, assignee, title, description, priority, project, due date — to a real audit trail.
-- Surfaces delivery-health analytics: workflow distribution, priority mix, blocked/overdue counts, and per-project completion rate.
+- Logs every meaningful change — status, assignee, title, description, priority, project, due date, and comments — to a real audit trail.
+- Surfaces delivery-health analytics that read like an engineering manager's dashboard: workflow distribution, priority mix, team workload per member, blocked/overdue counts, and per-project completion rate.
 - Lets staff create teammate accounts directly from the dashboard, with the login account and product profile created together.
 
 Stack: Django 5 + Django REST Framework on the backend, React + TypeScript + Vite on the frontend, session auth with CSRF, SQLite locally with Postgres support for deployment, and a Vitest/RTL test suite on the frontend.
