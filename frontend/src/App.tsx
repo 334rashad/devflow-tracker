@@ -155,6 +155,7 @@ export default function App() {
   const [editError, setEditError] = useState("");
   const [statusError, setStatusError] = useState("");
   const [comments, setComments] = useState<IssueComment[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentBody, setCommentBody] = useState("");
   const [commentLoading, setCommentLoading] = useState(false);
   const [commentError, setCommentError] = useState("");
@@ -384,12 +385,15 @@ export default function App() {
     }
 
     async function loadComments() {
+      setCommentsLoading(true);
       try {
         const response = await fetchJson(`/issue-comments/?issue=${selectedIssueId}`);
         const payload = await response.json();
         setComments(normalizeList<IssueComment>(payload));
       } catch (error) {
         console.error("Failed to load issue comments", error);
+      } finally {
+        setCommentsLoading(false);
       }
     }
 
@@ -956,7 +960,9 @@ export default function App() {
                 <div className="detail-comments">
                   <h3>Comments</h3>
                   <ul className="comment-list">
-                    {comments.length === 0 ? (
+                    {commentsLoading ? (
+                      <li className="empty-state">Loading comments…</li>
+                    ) : comments.length === 0 ? (
                       <li className="empty-state">No comments yet. Start the discussion below.</li>
                     ) : (
                       comments.map((comment) => (
